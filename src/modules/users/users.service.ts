@@ -14,17 +14,18 @@ export class UsersService {
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    // Hash the password before saving
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(createUserDto.password, salt);
 
-    // Create a new user object
     const newUser = this.usersRepository.create({
       ...createUserDto,
       password: hashedPassword,
     });
 
-    // Save the user to the database
     return this.usersRepository.save(newUser);
+  }
+
+  async findOneByEmail(email: string): Promise<User | null> {
+    return this.usersRepository.findOne({ where: { email } });
   }
 }

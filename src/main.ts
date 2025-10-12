@@ -1,10 +1,18 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import * as dotenv from 'dotenv';
 dotenv.config();
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+
 async function bootstrap() {
-  console.log(process.env.DB_PASSWORD);
   const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+
+  app.useGlobalInterceptors(new TransformInterceptor());
+
+  app.useGlobalFilters(new HttpExceptionFilter());
+
+  await app.listen(process.env.PORT ?? 3001);
 }
 bootstrap();
