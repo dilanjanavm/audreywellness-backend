@@ -31,4 +31,5 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+  username: any;
 }
