@@ -7,6 +7,9 @@ import { UsersModule } from './modules/users/users.module';
 import { ItemManagementModule } from './modules/item/item-management.module';
 import { CategoryModule } from './modules/category/category.module';
 import { SeedModule } from './database/seeds/seed.module';
+import { CustomerModule } from './modules/customer/customer.module';
+import { ComplaintModule } from './modules/complaint/complaint.module';
+import { AttachmentModule } from './modules/attachment/attachment.module';
 
 @Module({
   imports: [
@@ -29,6 +32,9 @@ import { SeedModule } from './database/seeds/seed.module';
     UsersModule,
     ItemManagementModule,
     SeedModule,
+    CustomerModule,
+    ComplaintModule,
+    AttachmentModule,
     CategoryModule,
   ],
   controllers: [],
