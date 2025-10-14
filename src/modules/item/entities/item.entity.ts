@@ -1,42 +1,83 @@
-// src/modules/item-management/entities/item.entity.ts
+// src/modules/item/entities/item.entity.ts
 import {
   Entity,
-  Column,
   PrimaryGeneratedColumn,
+  Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { CategoryEntity } from '../../category/entities/category.entity';
+import { ItemType, MBFlag, UnitType } from '../../../common/enums/item.enum';
 
-@Entity({ name: 'items' })
-export class Item {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity('items')
+export class ItemEntity {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-  @Column({ unique: true, nullable: false })
-  name: string;
+  @Column({ type: 'varchar', length: 50 })
+  type: ItemType;
 
-  // We'll treat these as simple number columns for now.
-  // Later, we can create relationships to Supplier and Ingredient entities.
+  @Column({ unique: true })
+  itemCode: string;
+
+  @Column()
+  stockId: string;
+
   @Column({ nullable: true })
-  supplier_id: number;
+  isbnNo: string;
 
-  @Column({ nullable: true })
-  ingredient_id: number;
-
-  @Column('text', { nullable: true })
+  @Column()
   description: string;
 
-  // Use 'decimal' for currency to avoid floating-point errors
-  @Column('decimal', { precision: 10, scale: 2, default: 0.0 })
-  unit_price: number;
+  // Category relationship - FIX: Reference categoryId instead of id
+  @ManyToOne(() => CategoryEntity, { nullable: false, eager: true })
+  @JoinColumn({ name: 'categoryId', referencedColumnName: 'categoryId' })
+  category: CategoryEntity;
+
+  @Column()
+  categoryId: string;
+
+  @Column({ type: 'varchar', length: 20 })
+  units: UnitType;
 
   @Column({ nullable: true })
-  category: string;
+  dummy: string;
 
-  // TypeORM will automatically manage these columns
+  @Column({ type: 'varchar', length: 1 })
+  mbFlag: MBFlag;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  price: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  altPrice: number;
+
+  @Column()
+  salesAccount: string;
+
+  @Column()
+  inventoryAccount: string;
+
+  @Column()
+  cogsAccount: string;
+
+  @Column()
+  adjustmentAccount: string;
+
+  @Column()
+  wipAccount: string;
+
+  @Column({ nullable: true })
+  hsCode: string;
+
+  @Column({ type: 'text', nullable: true })
+  longDescription: string;
+
   @CreateDateColumn()
-  created_at: Date;
+  createdAt: Date;
 
   @UpdateDateColumn()
-  updated_at: Date;
+  updatedAt: Date;
 }

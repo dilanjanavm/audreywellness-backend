@@ -5,6 +5,8 @@ import databaseConfig from './config/database.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { ItemManagementModule } from './modules/item/item-management.module';
+import { CategoryModule } from './modules/category/category.module';
+import { SeedModule } from './database/seeds/seed.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { ItemManagementModule } from './modules/item/item-management.module';
     AuthModule,
     UsersModule,
     ItemManagementModule,
+    SeedModule,
+    CategoryModule,
   ],
   controllers: [],
   providers: [],

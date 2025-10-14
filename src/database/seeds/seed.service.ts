@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../modules/users/user.entity';
-import { UserRole } from '../../common/enums/role.enum';
+import { UserRole } from '../../common/enums/user-role.enum';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -29,6 +29,7 @@ export class SeedService {
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(adminPassword, salt);
 
+    // FIX: Create user object directly without using .create() method
     const adminUser = this.userRepository.create({
       email: adminEmail,
       password: hashedPassword,
