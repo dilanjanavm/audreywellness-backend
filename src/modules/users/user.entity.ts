@@ -1,7 +1,14 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
-import { UserRole } from '../../common/enums/role.enum';
+// src/modules/users/user.entity.ts
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { UserRole } from '../../common/enums/user-role.enum';
 
-@Entity({ name: 'users' })
+@Entity('users')
 export class User {
   @PrimaryGeneratedColumn()
   id: number;
@@ -12,13 +19,16 @@ export class User {
   @Column()
   password: string;
 
-  @Column()
-  username: string;
-
   @Column({
     type: 'enum',
     enum: UserRole,
-    default: UserRole.STAFF,
+    default: UserRole.USER,
   })
   role: UserRole;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

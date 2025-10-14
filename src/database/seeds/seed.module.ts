@@ -1,14 +1,12 @@
+// src/database/seed/seed.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from '../../modules/users/user.entity';
 import { SeedService } from './seed.service';
-import { AppModule } from '../../app.module'; // Import AppModule
+import { User } from '../../modules/users/user.entity';
 
 @Module({
-  imports: [
-    AppModule, // Import the main AppModule to get the DB connection
-    TypeOrmModule.forFeature([User]),
-  ],
+  imports: [TypeOrmModule.forFeature([User])],
   providers: [SeedService],
+  exports: [SeedService],
 })
 export class SeedModule {}
