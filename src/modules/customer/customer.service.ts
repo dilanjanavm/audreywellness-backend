@@ -224,6 +224,7 @@ export class CustomerService {
         `✅ Found ${customers.length} customers for search: ${trimmedTerm}`,
       );
 
+
       return customers.map((customer) => this.mapToResponseDto(customer));
     } catch (error) {
       console.error('❌ Error in customer search:', error);

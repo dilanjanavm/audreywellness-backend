@@ -28,4 +28,9 @@ export class UsersService {
   async findOneByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { email } });
   }
+
+  // Alias method for AuthService compatibility
+  async findByEmail(email: string): Promise<User | null> {
+    return this.findOneByEmail(email);
+  }
 }
