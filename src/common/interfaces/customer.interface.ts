@@ -8,6 +8,7 @@ export interface CreateCustomerDto {
   sNo: string; // Added sNo field
   name: string;
   shortName: string;
+  phone?: string;
   branchName: string;
   cityArea: string;
   email?: string;

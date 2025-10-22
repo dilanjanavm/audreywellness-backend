@@ -10,7 +10,7 @@ import {
   ManyToMany,
 } from 'typeorm';
 import { CategoryEntity } from '../../category/entities/category.entity';
-import { ItemType, MBFlag, UnitType } from '../../../common/enums/item.enum';
+import { UnitType } from '../../../common/enums/item.enum';
 import { Supplier } from '../../suppliers/entities/supplier.entity';
 
 @Entity('items')
@@ -18,72 +18,46 @@ export class ItemEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  // Simple Many-to-Many relationship
-  @ManyToMany(() => Supplier, (supplier) => supplier.items)
-  suppliers: Supplier[];
-
-  @Column({ type: 'varchar', length: 50 })
-  type: ItemType;
-
   @Column({ unique: true })
   itemCode: string;
 
   @Column()
   stockId: string;
 
-  @Column({ nullable: true })
-  isbnNo: string;
-
   @Column()
   description: string;
 
-  // Category relationship - FIX: Reference categoryId instead of id
-  @ManyToOne(() => CategoryEntity, { nullable: false, eager: true })
-  @JoinColumn({ name: 'categoryId', referencedColumnName: 'categoryId' })
-  category: CategoryEntity;
-
+  // Store category name directly for simplicity
   @Column()
-  categoryId: string;
+  category: string;
+
+  // Optional: Keep category relationship for advanced features
+  @ManyToOne(() => CategoryEntity, { nullable: true, eager: true })
+  @JoinColumn({ name: 'categoryId' })
+  categoryEntity?: CategoryEntity;
+
+  @Column({ nullable: true })
+  categoryId?: string;
 
   @Column({ type: 'varchar', length: 20 })
   units: UnitType;
 
-  @Column({ nullable: true })
-  dummy: string;
-
-  @Column({ type: 'varchar', length: 1 })
-  mbFlag: MBFlag;
-
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   price: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   altPrice: number;
 
-  @Column()
-  salesAccount: string;
-
-  @Column()
-  inventoryAccount: string;
-
-  @Column()
-  cogsAccount: string;
-
-  @Column()
-  adjustmentAccount: string;
-
-  @Column()
-  wipAccount: string;
-
   @Column({ nullable: true })
-  hsCode: string;
-
-  @Column({ type: 'text', nullable: true })
-  longDescription: string;
+  currency: string;
 
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // Many-to-Many relationship with suppliers
+  @ManyToMany(() => Supplier, (supplier) => supplier.items)
+  suppliers: Supplier[];
 }

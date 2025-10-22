@@ -51,17 +51,18 @@ export class CustomerService {
     createCustomerDto: CreateCustomerDto,
   ): Promise<CustomerResponseDto> {
     // Check if SMS phone already exists
+    console.log(createCustomerDto);
     const existingCustomerByPhone = await this.customerRepository.findOne({
-      where: { smsPhone: createCustomerDto.smsPhone },
+      where: { shortName: createCustomerDto.shortName },
       withDeleted: true,
     });
-
+    console.log(existingCustomerByPhone);
     if (existingCustomerByPhone) {
       throw new ConflictException(
         `Customer with phone ${createCustomerDto.smsPhone} already exists`,
       );
     }
-
+    
     // Check if S_No already exists
     const existingCustomerBySNo = await this.customerRepository.findOne({
       where: { sNo: createCustomerDto.sNo },
