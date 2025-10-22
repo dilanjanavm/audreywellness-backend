@@ -1,5 +1,4 @@
 // src/common/interfaces/complaint.interface.ts
-
 import {
   ComplaintCategory,
   ComplaintStatus,
@@ -23,8 +22,6 @@ export interface CreateComplaintDto {
 }
 
 export interface UpdateComplaintDto {
-  closedAt: Date;
-  actualResolutionDate: Date;
   headline?: string;
   description?: string;
   category?: ComplaintCategory;
@@ -34,6 +31,14 @@ export interface UpdateComplaintDto {
   targetResolutionDate?: Date;
   clientFeedback?: string;
   feedbackRating?: number;
+  actualResolutionDate?: Date;
+  closedAt?: Date;
+}
+
+// NEW INTERFACE: For updating status separately
+export interface UpdateComplaintStatusDto {
+  status: ComplaintStatus;
+  note?: string; // Optional note for the status change
 }
 
 export interface ComplaintResponseDto {
@@ -45,7 +50,7 @@ export interface ComplaintResponseDto {
   category: ComplaintCategory;
   priority: PriorityLevel;
   status: ComplaintStatus;
-  assignedTo: any; // User response
+  assignedTo: any;
   targetResolutionDate: Date;
   actualResolutionDate?: Date;
   closedAt?: Date;
@@ -60,7 +65,7 @@ export interface TimelineEntryResponseDto {
   id: string;
   entryType: string;
   description: string;
-  createdBy: any; // User response
+  createdBy: any;
   createdAt: Date;
 }
 

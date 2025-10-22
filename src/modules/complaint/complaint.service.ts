@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In, ILike } from 'typeorm';
@@ -15,11 +16,15 @@ import {
   UpdateComplaintDto,
   ComplaintResponseDto,
   ComplaintSearchFilters,
+  UpdateComplaintStatusDto,
 } from '../../common/interfaces/complaint.interface';
 
 import { TimelineEntryType } from '../../common/interfaces/timeline.interface';
 import { UsersService } from '../users/users.service';
-import { ComplaintStatus, PriorityLevel } from '../../common/enums/complain.enum';
+import {
+  ComplaintStatus,
+  PriorityLevel,
+} from '../../common/enums/complain.enum';
 
 @Injectable()
 export class ComplaintService {
@@ -51,17 +56,19 @@ export class ComplaintService {
     createComplaintDto: CreateComplaintDto,
   ): Promise<CustomerEntity | null> {
     try {
-      // First, try to find customer by email
+      // First, try to find customer by email or phone
       const existingCustomers = await this.customerService.search(
-        createComplaintDto.customerEmail,
+        createComplaintDto.customerEmail || createComplaintDto.customerPhone,
       );
+
       const existingCustomer = existingCustomers.find(
-        (customer) => customer.email === createComplaintDto.customerEmail,
+        (customer) =>
+          customer.email === createComplaintDto.customerEmail ||
+          customer.smsPhone === createComplaintDto.customerPhone,
       );
 
       if (existingCustomer) {
-        console.log(`✅ Found existing customer: ${existingCustomer.fullName}`);
-        // Convert CustomerResponseDto to CustomerEntity (we need the full entity)
+        console.log(`✅ Found existing customer: ${existingCustomer.name}`);
         const customerRepo =
           this.complaintRepository.manager.getRepository(CustomerEntity);
         return await customerRepo.findOne({
@@ -73,10 +80,21 @@ export class ComplaintService {
       console.log(
         `🆕 Creating new customer: ${createComplaintDto.customerName}`,
       );
+
+      // Generate S_No for new customer
+      const sNo = await this.customerService.generateSNo();
+
       const newCustomer = await this.customerService.create({
-        fullName: createComplaintDto.customerName,
+        sNo,
+        name: createComplaintDto.customerName,
+        shortName: createComplaintDto.customerName.substring(0, 20), // Truncate for short name
+        branchName: createComplaintDto.customerCompany || 'Main Branch',
+        cityArea: 'Unknown', // Default value
         email: createComplaintDto.customerEmail,
-        phone: createComplaintDto.customerPhone,
+        smsPhone: createComplaintDto.customerPhone,
+        currency: 'LKR',
+        salesGroup: 'General', // Default group
+        address: '', // Empty address
       });
 
       // Convert CustomerResponseDto to CustomerEntity
@@ -113,10 +131,9 @@ export class ComplaintService {
         headline: createComplaintDto.headline,
         description: createComplaintDto.description,
         category: createComplaintDto.category,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         priority: createComplaintDto.priority || PriorityLevel.MEDIUM,
         status: ComplaintStatus.OPEN,
-        assignedToId: createComplaintDto.assignedToId || createdById, // Default to creator
+        assignedToId: createComplaintDto.assignedToId || createdById,
         targetResolutionDate: createComplaintDto.targetResolutionDate,
       });
 
@@ -317,6 +334,114 @@ export class ComplaintService {
     }
   }
 
+  // NEW METHOD: Update complaint status separately
+  async updateStatus(
+    id: string,
+    updateStatusDto: UpdateComplaintStatusDto,
+    updatedById: string,
+  ): Promise<ComplaintResponseDto> {
+    try {
+      const complaint = await this.complaintRepository.findOne({
+        where: { id },
+        relations: ['customer', 'assignedTo'],
+      });
+
+      if (!complaint) {
+        throw new NotFoundException(`Complaint with ID ${id} not found`);
+      }
+
+      // Validate status transition
+      this.validateStatusTransition(complaint.status, updateStatusDto.status);
+
+      // Create timeline entry for status change
+      await this.createTimelineEntry(
+        id,
+        updatedById,
+        TimelineEntryType.STATUS_CHANGE,
+        `Status changed from ${complaint.status} to ${updateStatusDto.status}`,
+      );
+
+      const updateData: Partial<ComplaintEntity> = {
+        status: updateStatusDto.status,
+      };
+
+      // Set resolution date if status is RESOLVED
+      if (
+        updateStatusDto.status === ComplaintStatus.RESOLVED &&
+        !complaint.actualResolutionDate
+      ) {
+        updateData.actualResolutionDate = new Date();
+      }
+
+      // Set closed date if status is CLOSED
+      if (
+        updateStatusDto.status === ComplaintStatus.CLOSED &&
+        !complaint.closedAt
+      ) {
+        updateData.closedAt = new Date();
+      }
+
+      // Add note if provided
+      if (updateStatusDto.note) {
+        await this.createTimelineEntry(
+          id,
+          updatedById,
+          TimelineEntryType.NOTE_ADDED,
+          updateStatusDto.note,
+        );
+      }
+
+      const updatedComplaint = await this.complaintRepository.save({
+        ...complaint,
+        ...updateData,
+      });
+
+      return this.mapToResponseDto(updatedComplaint);
+    } catch (error) {
+      console.error('Error updating complaint status:', error);
+      throw error;
+    }
+  }
+
+  // Validate status transitions
+  private validateStatusTransition(
+    currentStatus: ComplaintStatus,
+    newStatus: ComplaintStatus,
+  ): void {
+    const validTransitions: Record<ComplaintStatus, ComplaintStatus[]> = {
+      [ComplaintStatus.OPEN]: [
+        ComplaintStatus.IN_PROGRESS,
+        ComplaintStatus.RESOLVED,
+        ComplaintStatus.CLOSED,
+      ],
+      [ComplaintStatus.IN_PROGRESS]: [
+        ComplaintStatus.RESOLVED,
+        ComplaintStatus.OPEN,
+        ComplaintStatus.CLOSED,
+      ],
+      [ComplaintStatus.RESOLVED]: [
+        ComplaintStatus.CLOSED,
+        ComplaintStatus.AWAITING_FEEDBACK,
+        ComplaintStatus.REOPENED,
+      ],
+      [ComplaintStatus.AWAITING_FEEDBACK]: [
+        ComplaintStatus.CLOSED,
+        ComplaintStatus.REOPENED,
+      ],
+      [ComplaintStatus.CLOSED]: [ComplaintStatus.REOPENED],
+      [ComplaintStatus.REOPENED]: [
+        ComplaintStatus.IN_PROGRESS,
+        ComplaintStatus.RESOLVED,
+      ],
+    };
+
+    if (!validTransitions[currentStatus]?.includes(newStatus)) {
+      throw new BadRequestException(
+        `Invalid status transition from ${currentStatus} to ${newStatus}`,
+      );
+    }
+  }
+
   async addNote(
     complaintId: string,
     note: string,
@@ -371,7 +496,7 @@ export class ComplaintService {
 
       await this.createTimelineEntry(
         id,
-        complaint.assignedToId, // Use assigned staff ID
+        complaint.assignedToId,
         TimelineEntryType.NOTE_ADDED,
         `Customer feedback received: Rating ${rating}/5`,
       );
@@ -419,12 +544,23 @@ export class ComplaintService {
     if (!customer) return null;
 
     return {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
       id: customer.id,
-      customerCode: customer.customerCode,
-      fullName: customer.fullName,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
+      sNo: customer.sNo, // Updated from customerCode to sNo
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
+      name: customer.name, // Updated from fullName to name
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
       email: customer.email,
-      phone: customer.phone,
-      company: customer.company,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
+      phone: customer.smsPhone, // Updated from phone to smsPhone
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
+      branchName: customer.branchName,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
+      cityArea: customer.cityArea,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
+      salesGroup: customer.salesGroup,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
       customerType: customer.customerType,
     };
   }
