@@ -1,52 +1,41 @@
 // src/common/interfaces/item.interface.ts
-import { ItemType, MBFlag, UnitType } from '../enums/item.enum';
+import { UnitType } from '../enums/item.enum';
+import { Supplier } from '../../modules/suppliers/entities/supplier.entity';
 
 export interface CreateItemDto {
-  type: ItemType;
   itemCode: string;
   stockId: string;
-  isbnNo?: string;
   description: string;
-  categoryId: string;
+  category: string;
   units: UnitType;
-  dummy?: string;
-  mbFlag: MBFlag;
-  price: number;
-  altPrice: number;
-  salesAccount: string;
-  inventoryAccount: string;
-  cogsAccount: string;
-  adjustmentAccount: string;
-  wipAccount: string;
-  hsCode?: string;
-  longDescription?: string;
+  price?: number;
+  altPrice?: number;
+  currency?: string;
+  supplierIds?: string[]; // Array of supplier IDs
 }
 
-// Make sure these enums exist and match
-
-export type UpdateItemDto = Partial<CreateItemDto>;
+export interface UpdateItemDto {
+  description?: string;
+  category?: string;
+  units?: UnitType;
+  price?: number;
+  altPrice?: number;
+  currency?: string;
+  supplierIds?: string[];
+}
 
 export interface ItemResponseDto {
   id: string;
-  type: ItemType;
   itemCode: string;
   stockId: string;
-  isbnNo?: string;
   description: string;
-  categoryName: string;
-  categoryId: string;
+  category: string;
+  categoryId?: string;
   units: UnitType;
-  dummy?: string;
-  mbFlag: MBFlag;
-  price: number;
-  altPrice: number;
-  salesAccount: string;
-  inventoryAccount: string;
-  cogsAccount: string;
-  adjustmentAccount: string;
-  wipAccount: string;
-  hsCode?: string;
-  longDescription?: string;
+  price?: number;
+  altPrice?: number;
+  currency?: string;
+  suppliers?: Supplier[]; // Include suppliers in response
   createdAt: Date;
   updatedAt: Date;
 }
