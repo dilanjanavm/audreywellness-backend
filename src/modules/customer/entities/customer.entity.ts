@@ -1,6 +1,8 @@
+// src/modules/customer/entities/customer.entity.ts
 import {
   Column,
-  CreateDateColumn, DeleteDateColumn,
+  CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -8,41 +10,75 @@ import {
 } from 'typeorm';
 import { CustomerType } from '../../../common/enums/customer.enum';
 import { ComplaintEntity } from '../../complaint/entities/complaint.entity';
+import { SalesType } from '../../../common/enums/sales-type';
+import { PaymentTerms } from '../../../common/enums/payment-terms';
+import { Status } from '../../../common/enums/status';
 
 @Entity('customers')
 export class CustomerEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
-  customerCode: string; // CUST-2025-001 (auto-generated)
-
-  @Column()
-  fullName: string;
-
   @Column({ unique: true })
+  sNo: string; // Changed from customerCode to sNo (S_No from CSV)
+
+  @Column()
+  name: string; // Full business/customer name
+
+  @Column()
+  shortName: string; // Short name/identifier
+
+  @Column()
+  branchName: string; // Branch name
+
+  @Column()
+  cityArea: string; // City/Area
+
+  @Column({ nullable: true })
   email: string;
 
   @Column()
-  phone: string;
+  smsPhone: string; // SMS phone number
+
+  @Column({ default: 'LKR' })
+  currency: string;
 
   @Column({
     type: 'enum',
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    enum: SalesType,
+    default: SalesType.RETAIL,
+  })
+  salesType: SalesType;
+
+  @Column({
+    type: 'enum',
+    enum: PaymentTerms,
+    default: PaymentTerms.COD_IML,
+  })
+  paymentTerms: PaymentTerms;
+
+  @Column({ type: 'date', nullable: true })
+  dob: Date; // Date of Birth or Establishment
+
+  @Column({ type: 'text', nullable: true })
+  address: string;
+
+  @Column({
+    type: 'enum',
+    enum: Status,
+    default: Status.ACTIVE,
+  })
+  status: Status;
+
+  @Column()
+  salesGroup: string; // Sales Group/Category
+
+  @Column({
+    type: 'enum',
     enum: CustomerType,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access
     default: CustomerType.INDIVIDUAL,
   })
   customerType: CustomerType;
-
-  @Column({ nullable: true })
-  address: string;
-
-  @Column({ nullable: true })
-  city: string;
-
-  @Column({ nullable: true })
-  country: string;
 
   @OneToMany(() => ComplaintEntity, (complaint) => complaint.customer)
   complaints: ComplaintEntity[];

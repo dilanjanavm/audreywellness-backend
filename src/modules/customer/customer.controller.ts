@@ -11,7 +11,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
   DefaultValuePipe,
-  ParseIntPipe,
+  ParseIntPipe, UseInterceptors, UploadedFile, BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -19,7 +19,12 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { CustomerService } from './customer.service';
 import * as customerInterface from '../../common/interfaces/customer.interface';
-import { CustomerResponseDto } from '../../common/interfaces/customer.interface';
+
+import { CustomerType } from '../../common/enums/customer.enum';
+import { SalesType } from '../../common/enums/sales-type';
+import { Status } from '../../common/enums/status';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { CsvImportResponseDto } from '../../common/interfaces/customer.interface';
 
 @Controller('customers')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -34,11 +39,47 @@ export class CustomerController {
     return this.customerService.create(createCustomerDto);
   }
 
+  @Post('import-csv')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @UseInterceptors(FileInterceptor('file'))
+  async importCsv(
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<CsvImportResponseDto> {
+    if (!file) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      throw new BadRequestException('No file uploaded');
+    }
+
+    if (!file.originalname.endsWith('.csv')) {
+      throw new BadRequestException('Only CSV files are allowed');
+    }
+    if (file.size === 0) {
+      throw new BadRequestException('File is empty');
+    }
+
+    const result = await this.customerService.importFromCsv(file.buffer);
+
+    return {
+      success: result.success,
+      message: result.message,
+      totalRecords: result.totalRecords,
+      imported: result.imported,
+      updated: result.updated,
+      skipped: result.skipped,
+      errors: result.errors,
+    };
+  }
+
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
   async findAll(
     @Query('search') searchTerm?: string,
-    @Query('type') customerType?: string,
+    @Query('type') customerType?: CustomerType,
+    @Query('salesType') salesType?: SalesType,
+    @Query('status') status?: Status,
+    @Query('cityArea') cityArea?: string,
+    @Query('salesGroup') salesGroup?: string,
+    @Query('sNo') sNo?: string, // Added sNo query parameter
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number = 10,
   ): Promise<{
@@ -49,10 +90,16 @@ export class CustomerController {
   }> {
     const filters: customerInterface.CustomerSearchFilters = {
       searchTerm,
+      customerType,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      customerType: customerType as any,
+      salesType,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      status,
+      cityArea,
+      salesGroup,
+      sNo, // Added sNo to filters
       page,
-      limit: limit > 100 ? 100 : limit, // Prevent excessive limits
+      limit: limit > 100 ? 100 : limit,
     };
 
     return this.customerService.findAll(filters);
@@ -66,6 +113,14 @@ export class CustomerController {
     return this.customerService.findOne(id);
   }
 
+  @Get('sno/:sNo')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  async findOneBySNo(
+    @Param('sNo') sNo: string,
+  ): Promise<customerInterface.CustomerResponseDto> {
+    return this.customerService.findOneBySNo(sNo);
+  }
+
   @Put(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async update(
@@ -75,13 +130,11 @@ export class CustomerController {
     return this.customerService.update(id, updateCustomerDto);
   }
 
-  // In customer.controller.ts - update the delete endpoint
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ message: string }> {
-    console.log(id);
     return this.customerService.remove(id);
   }
 
@@ -89,7 +142,7 @@ export class CustomerController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
   async search(
     @Param('term') searchTerm: string,
-  ): Promise<CustomerResponseDto[]> {
+  ): Promise<customerInterface.CustomerResponseDto[]> {
     return this.customerService.search(searchTerm);
   }
 
@@ -99,7 +152,7 @@ export class CustomerController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{
     message: string;
-    customer: CustomerResponseDto;
+    customer: customerInterface.CustomerResponseDto;
     complaints: any[];
   }> {
     return this.customerService.findCustomerComplaints(id);
