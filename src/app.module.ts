@@ -10,6 +10,7 @@ import { SeedModule } from './database/seeds/seed.module';
 import { CustomerModule } from './modules/customer/customer.module';
 import { ComplaintModule } from './modules/complaint/complaint.module';
 import { AttachmentModule } from './modules/attachment/attachment.module';
+import { SuppliersModule } from './modules/suppliers/suppliers.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AttachmentModule } from './modules/attachment/attachment.module';
     CustomerModule,
     ComplaintModule,
     AttachmentModule,
+    SuppliersModule,
     CategoryModule,
   ],
   controllers: [],

@@ -7,14 +7,20 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  ManyToMany,
 } from 'typeorm';
 import { CategoryEntity } from '../../category/entities/category.entity';
 import { ItemType, MBFlag, UnitType } from '../../../common/enums/item.enum';
+import { Supplier } from '../../suppliers/entities/supplier.entity';
 
 @Entity('items')
 export class ItemEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  // Simple Many-to-Many relationship
+  @ManyToMany(() => Supplier, (supplier) => supplier.items)
+  suppliers: Supplier[];
 
   @Column({ type: 'varchar', length: 50 })
   type: ItemType;
