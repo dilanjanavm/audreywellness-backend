@@ -436,6 +436,7 @@ export class ItemManagementController {
         'price',
         'alt_price',
         'currency',
+        'status', // Added status column
       ];
 
       const exampleData = [
@@ -447,6 +448,7 @@ export class ItemManagementController {
         '1500.00',
         '1400.00',
         'LKR',
+        'ACTIVE',
       ];
 
       const templateContent = [
@@ -454,8 +456,10 @@ export class ItemManagementController {
         exampleData.join(','),
         '# Fill in your data below this line',
         '# Required fields: item_code, description, category, units',
-        '# Optional fields: stock_id, price, alt_price, currency',
+        '# Optional fields: stock_id, price, alt_price, currency, status',
         '# Units: pcs, Kg, ltr, boxes, Nos',
+        '# Status: ACTIVE, INACTIVE (default: ACTIVE)',
+        '# Category: Will be auto-created if not exists',
       ].join('\n');
 
       res.set({

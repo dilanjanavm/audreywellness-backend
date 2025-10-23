@@ -1,4 +1,3 @@
-// src/modules/item/entities/item.entity.ts
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -12,6 +11,7 @@ import {
 import { CategoryEntity } from '../../category/entities/category.entity';
 import { UnitType } from '../../../common/enums/item.enum';
 import { Supplier } from '../../suppliers/entities/supplier.entity';
+import { Status } from '../../../common/enums/status';
 
 @Entity('items')
 export class ItemEntity {
@@ -51,14 +51,18 @@ export class ItemEntity {
   @Column({ nullable: true })
   currency: string;
 
+  @Column({
+    type: 'enum',
+    enum: Status,
+    default: Status.ACTIVE,
+  })
+  status: Status;
+
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @Column({ type: 'enum', enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' })
-  status: string;
 
   // Many-to-Many relationship with suppliers
   @ManyToMany(() => Supplier, (supplier) => supplier.items)

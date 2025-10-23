@@ -7,10 +7,11 @@ import { ItemEntity } from './entities/item.entity';
 import { Supplier } from '../suppliers/entities/supplier.entity';
 import { CategoryModule } from '../category/category.module';
 import { SuppliersModule } from '../suppliers/suppliers.module';
+import { CategoryEntity } from '../category/entities/category.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ItemEntity, Supplier]),
+    TypeOrmModule.forFeature([ItemEntity, CategoryEntity, Supplier]),
     CategoryModule,
     SuppliersModule,
   ],

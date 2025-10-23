@@ -8,6 +8,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { ItemEntity } from '../../item/entities/item.entity';
+import { Status } from 'src/common/enums/status';
 
 @Entity('categories')
 export class CategoryEntity {
@@ -15,7 +16,7 @@ export class CategoryEntity {
   id: string;
 
   @Column({ unique: true })
-  categoryId: string; // Like "CAT001", "CAT002"
+  categoryId: string;
 
   @Column()
   categoryName: string;
@@ -24,16 +25,19 @@ export class CategoryEntity {
   categoryDesc: string;
 
   @Column({ nullable: true })
-  categoryColor: string; // Hex color code like "#FF5733"
-
+  categoryColor: string;
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-  
-  @Column({ type: 'enum', enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' })
-  status: string;
+
+  @Column({
+    type: 'enum',
+    enum: Status,
+    default: Status.ACTIVE,
+  })
+  status: Status;
 
   @OneToMany(() => ItemEntity, (item) => item.category)
   items: ItemEntity[];
