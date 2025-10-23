@@ -1,4 +1,3 @@
-// src/modules/category/category.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -93,8 +92,9 @@ export class CategoryService {
       categoryName: category.categoryName,
       categoryDesc: category.categoryDesc,
       categoryColor: category.categoryColor,
-      createdAt: category.createdAt,
-      updatedAt: category.updatedAt,
+      status: category.status, // Added status
+      createdAt: category.createdAt, // Added createdAt
+      updatedAt: category.updatedAt, // Added updatedAt
     };
   }
 }

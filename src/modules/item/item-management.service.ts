@@ -20,6 +20,8 @@ import {
 import { UnitType } from '../../common/enums/item.enum';
 import { CategoryService } from '../category/category.service';
 import { Supplier } from '../suppliers/entities/supplier.entity';
+import { CategoryEntity } from '../category/entities/category.entity';
+import { Status } from '../../common/enums/status';
 
 @Injectable()
 export class ItemManagementService {
@@ -32,13 +34,17 @@ export class ItemManagementService {
     'price',
     'alt_price',
     'currency',
+    'status',
   ];
+
 
   constructor(
     @InjectRepository(ItemEntity)
     private readonly itemRepository: Repository<ItemEntity>,
     @InjectRepository(Supplier)
     private readonly supplierRepository: Repository<Supplier>,
+    @InjectRepository(CategoryEntity)
+    private readonly categoryRepository: Repository<CategoryEntity>,
     private readonly categoryService: CategoryService,
   ) {}
 
@@ -100,6 +106,7 @@ export class ItemManagementService {
       };
 
       if (includeSuppliers) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         options.relations = ['suppliers'];
       }
 
@@ -124,6 +131,7 @@ export class ItemManagementService {
       };
 
       if (includeSuppliers) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         options.relations = ['suppliers'];
       }
 
@@ -303,6 +311,7 @@ export class ItemManagementService {
 
       // Remove duplicates based on supplier ID
       const uniqueSuppliers = newSuppliers.reduce((acc, current) => {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
         const exists = acc.find((supplier) => supplier.id === current.id);
         if (!exists) {
@@ -392,6 +401,9 @@ export class ItemManagementService {
   /**
    * Import items from CSV
    */
+  /**
+   * Import items from CSV with category auto-creation
+   */
   async importFromCSV(csvContent: string): Promise<CSVImportResult> {
     const result: CSVImportResult = {
       success: false,
@@ -417,17 +429,20 @@ export class ItemManagementService {
           const rowData = this.parseCSVLine(lines[i]);
 
           // Skip empty rows
-          if (rowData.every((field) => !field.trim())) {
+          if (rowData.every((field: string): boolean => !field.trim())) {
             continue;
           }
 
-          const itemData = this.mapCSVRowToItemData(rowData);
+          // FIX: Add await here since mapCSVRowToItemData is now async
+          const itemData: CreateItemDto | null =
+            await this.mapCSVRowToItemData(rowData);
 
           if (itemData) {
             // Check if item already exists
-            const existingItem = await this.itemRepository.findOne({
-              where: { itemCode: itemData.itemCode },
-            });
+            const existingItem: ItemEntity | null =
+              await this.itemRepository.findOne({
+                where: { itemCode: itemData.itemCode },
+              });
 
             if (existingItem) {
               // Update existing item
@@ -460,6 +475,81 @@ export class ItemManagementService {
     }
 
     return result;
+  }
+
+  /**
+   * Find or create category by name
+   */
+  private async findOrCreateCategory(
+    categoryName: string,
+  ): Promise<{ id: string; categoryId: string }> {
+    if (!categoryName?.trim()) {
+      throw new BadRequestException('Category name is required');
+    }
+
+    // First, try to find by categoryName
+    const existingCategory = await this.categoryRepository.findOne({
+      where: { categoryName: categoryName.trim() },
+    });
+
+    if (existingCategory) {
+      return {
+        id: existingCategory.id,
+        categoryId: existingCategory.categoryId,
+      };
+    }
+
+    // If not found, create new category
+    const newCategoryId = await this.generateNextCategoryId();
+    const randomColor = this.generateRandomColor();
+
+    const newCategory = this.categoryRepository.create({
+      categoryId: newCategoryId,
+      categoryName: categoryName.trim(),
+      categoryDesc: `Auto-generated category for ${categoryName}`,
+      categoryColor: randomColor,
+      status: Status.ACTIVE,
+    });
+
+    const savedCategory = await this.categoryRepository.save(newCategory);
+
+    return {
+      id: savedCategory.id,
+      categoryId: savedCategory.categoryId,
+    };
+  }
+
+  private generateRandomColor(): string {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  }
+
+  /**
+   * Generate next category ID (CAT001, CAT002, etc.)
+   */
+  private async generateNextCategoryId(): Promise<string> {
+    const lastCategory = await this.categoryRepository.findOne({
+      where: {},
+      order: { categoryId: 'DESC' },
+    });
+
+    if (!lastCategory) {
+      return 'CAT001';
+    }
+
+    const matches = lastCategory.categoryId.match(/CAT(\d+)/);
+    if (matches && matches[1]) {
+      const nextNumber = parseInt(matches[1]) + 1;
+      return `CAT${nextNumber.toString().padStart(3, '0')}`;
+    }
+
+    // Fallback: generate based on count
+    const totalCategories = await this.categoryRepository.count();
+    return `CAT${(totalCategories + 1).toString().padStart(3, '0')}`;
   }
 
   /**
@@ -604,6 +694,7 @@ export class ItemManagementService {
       price: item.price,
       altPrice: item.altPrice,
       currency: item.currency,
+      status: item.status,
       suppliers: item.suppliers,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
@@ -638,8 +729,10 @@ export class ItemManagementService {
   /**
    * Map CSV row to item data
    */
-  private mapCSVRowToItemData(rowData: string[]): CreateItemDto | null {
-    // Expected columns: item_code, stock_id, description, category, units, price, alt_price, currency
+  private async mapCSVRowToItemData(
+    rowData: string[],
+  ): Promise<CreateItemDto | null> {
+    // Expected columns: item_code, stock_id, description, category, units, price, alt_price, currency, status
     if (rowData.length < 5) {
       throw new Error(
         `Invalid row format. Expected at least 5 columns, got ${rowData.length}`,
@@ -655,6 +748,7 @@ export class ItemManagementService {
       price,
       altPrice,
       currency,
+      status,
     ] = rowData;
 
     // Validate required fields
@@ -671,19 +765,32 @@ export class ItemManagementService {
       throw new Error('Missing required field: units');
     }
 
+    // Find or create category
+    const categoryInfo = await this.findOrCreateCategory(category.trim());
+
     // Parse numeric fields
     const parsedPrice = price ? parseFloat(price) : 0;
     const parsedAltPrice = altPrice ? parseFloat(altPrice) : 0;
+
+    // Parse status
+
+    const itemStatus = status?.trim()
+      ? status.trim().toUpperCase() === 'INACTIVE'
+        ? Status.INACTIVE
+        : Status.ACTIVE
+      : Status.ACTIVE;
 
     return {
       itemCode: itemCode.trim(),
       stockId: (stockId || itemCode).trim(), // Use itemCode if stockId is empty
       description: description.trim(),
-      category: category.trim(),
+      category: category.trim(), // Store category name
+      categoryId: categoryInfo.id, // Store category relationship ID
       units: this.parseUnitType(units.trim()),
       price: isNaN(parsedPrice) ? 0 : parsedPrice,
       altPrice: isNaN(parsedAltPrice) ? 0 : parsedAltPrice,
       currency: (currency || 'LKR').trim(),
+      status: itemStatus,
     };
   }
 
