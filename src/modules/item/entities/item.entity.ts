@@ -57,6 +57,9 @@ export class ItemEntity {
   @UpdateDateColumn()
   updatedAt: Date;
 
+  @Column({ type: 'enum', enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' })
+  status: string;
+
   // Many-to-Many relationship with suppliers
   @ManyToMany(() => Supplier, (supplier) => supplier.items)
   suppliers: Supplier[];

@@ -31,6 +31,9 @@ export class CategoryEntity {
 
   @UpdateDateColumn()
   updatedAt: Date;
+  
+  @Column({ type: 'enum', enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' })
+  status: string;
 
   @OneToMany(() => ItemEntity, (item) => item.category)
   items: ItemEntity[];
