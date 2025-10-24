@@ -419,6 +419,38 @@ export class ItemManagementController {
     }
   }
 
+  @Post('categories/items')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  async findByCategoryIds(
+    @Body() body: { categoryIds: string[] },
+  ): Promise<{ data: itemInterface.ItemResponseDto[] }> {
+    // eslint-disable-next-line no-useless-catch
+    try {
+      if (!body.categoryIds || !Array.isArray(body.categoryIds)) {
+        throw new BadRequestException('categoryIds must be an array of UUIDs');
+      }
+
+      if (body.categoryIds.length === 0) {
+        throw new BadRequestException('categoryIds array cannot be empty');
+      }
+
+      // Validate UUID format
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      for (const categoryId of body.categoryIds) {
+        if (!uuidRegex.test(categoryId)) {
+          throw new BadRequestException(`Invalid UUID format: ${categoryId}`);
+        }
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const items = await this.itemService.findByCategoryIds(body.categoryIds);
+      return { data: items };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   /**
    * Download CSV template
    */
