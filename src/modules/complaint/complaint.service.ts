@@ -139,13 +139,7 @@ export class ComplaintService {
 
       const savedComplaint = await this.complaintRepository.save(complaint);
 
-      // Step 4: Create initial timeline entry
-      await this.createTimelineEntry(
-        savedComplaint.id,
-        createdById,
-        TimelineEntryType.STATUS_CHANGE,
-        `Complaint created and set to ${ComplaintStatus.OPEN}`,
-      );
+       // Step 4: Create initial timeline entry
 
       console.log(`✅ Complaint created successfully: ${complaintNumber}`);
 

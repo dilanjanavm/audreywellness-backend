@@ -105,6 +105,24 @@ export class ComplaintController {
     );
   }
 
+  /**
+   * Update complaint status with validation and timeline tracking
+   */
+  @Put(':id/status')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  async updateStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateStatusDto: complaintInterface.UpdateComplaintStatusDto,
+    @Request() req,
+  ): Promise<complaintInterface.ComplaintResponseDto> {
+    return this.complaintService.updateStatus(
+      id,
+      updateStatusDto,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      req.user.userId,
+    );
+  }
+
   @Post(':id/notes')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
   async addNote(
@@ -112,7 +130,7 @@ export class ComplaintController {
     @Body('note') note: string,
     @Request() req,
   ): Promise<complaintInterface.ComplaintResponseDto> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     return this.complaintService.addNote(id, note, req.user.userId);
   }
 

@@ -37,7 +37,6 @@ export class ItemManagementService {
     'status',
   ];
 
-
   constructor(
     @InjectRepository(ItemEntity)
     private readonly itemRepository: Repository<ItemEntity>,
@@ -115,6 +114,39 @@ export class ItemManagementService {
     } catch (error) {
       console.error('Error finding all items:', error);
       throw new InternalServerErrorException('Failed to retrieve items');
+    }
+  }
+
+  async findByCategoryIds(categoryIds: string[]): Promise<ItemResponseDto[]> {
+    try {
+      if (!categoryIds || categoryIds.length === 0) {
+        throw new BadRequestException('Category IDs array cannot be empty');
+      }
+
+      // Validate that all category IDs exist
+      const categories = await this.categoryRepository.find({
+        where: { id: In(categoryIds) },
+      });
+
+      if (categories.length !== categoryIds.length) {
+        throw new BadRequestException('Some category IDs were not found');
+      }
+
+      const items = await this.itemRepository.find({
+        where: { categoryId: In(categoryIds) },
+        relations: ['suppliers'], // Include suppliers for costing
+        order: { itemCode: 'ASC' },
+      });
+
+      return items.map((item) => this.mapToResponseDto(item));
+    } catch (error) {
+      console.error('Error finding items by category IDs:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Failed to retrieve items by category IDs',
+      );
     }
   }
 
