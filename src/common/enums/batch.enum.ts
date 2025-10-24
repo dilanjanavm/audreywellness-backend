@@ -1,5 +1,5 @@
 export enum BatchSize {
-  BATCH_0_5_KG = 'batch0.5kg',
+  BATCH_0_5_KG = 'batch0_5kg',
   BATCH_1_KG = 'batch1kg',
   BATCH_10_KG = 'batch10kg',
   BATCH_25_KG = 'batch25kg',
