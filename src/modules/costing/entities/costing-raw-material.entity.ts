@@ -1,16 +1,16 @@
+// src/modules/costing/entities/costing-raw-material.entity.ts
 import {
-  Column,
-  CreateDateColumn,
   Entity,
-  JoinColumn,
-  ManyToOne,
   PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { CostingEntity } from './costing.entity';
 import { ItemEntity } from '../../item/entities/item.entity';
 
-// src/modules/costing/entities/costing-raw-material.entity.ts
 @Entity('costing_raw_materials')
 export class CostingRawMaterial {
   @PrimaryGeneratedColumn('uuid')
@@ -25,7 +25,6 @@ export class CostingRawMaterial {
   @Column()
   costingId: string;
 
-  // Link to actual raw material item from your items table
   @ManyToOne(() => ItemEntity, { eager: true })
   @JoinColumn({ name: 'rawMaterialItemId' })
   rawMaterialItem: ItemEntity;
@@ -40,9 +39,8 @@ export class CostingRawMaterial {
   percentage: number;
 
   @Column('decimal', { precision: 10, scale: 2 })
-  unitPrice: number; // Snapshot of price at costing time
+  unitPrice: number;
 
-  // Link to supplier from your suppliers table
   @Column()
   supplierId: string;
 
@@ -60,6 +58,19 @@ export class CostingRawMaterial {
 
   @Column('decimal', { precision: 10, scale: 2 })
   amountNeeded: number;
+
+  // Store batch calculations as JSON
+  @Column('json')
+  batchCalculations: {
+    batch0_5kg: { cost: number; kg: number };
+    batch1kg: { cost: number; kg: number };
+    batch10kg: { cost: number; kg: number };
+    batch25kg: { cost: number; kg: number };
+    batch50kg: { cost: number; kg: number };
+    batch100kg: { cost: number; kg: number };
+    batch150kg: { cost: number; kg: number };
+    batch200kg: { cost: number; kg: number };
+  };
 
   // Calculated fields
   @Column('decimal', { precision: 15, scale: 4 })
