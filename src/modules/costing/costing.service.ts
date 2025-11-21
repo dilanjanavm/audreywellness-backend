@@ -1,4 +1,3 @@
-// src/modules/costing/costing.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -6,7 +5,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { CostingEntity } from './entities/costing.entity';
 import { CostingRawMaterial } from './entities/costing-raw-material.entity';
 import { CostingAdditionalCost } from './entities/costing-additional-cost.entity';
@@ -20,7 +19,15 @@ import {
 import { UpdateCostingDto } from './dto/update-costing.dto';
 import { CostingResponseDto } from './dto/costing-response.dto';
 import { BatchSize } from '../../common/enums/batch.enum';
-import { Status } from '../../common/enums/common.enum';
+import { Status } from '../../common/enums/status';
+import {
+  ItemsByCategoriesDto,
+  ItemsWithCostingQueryDto,
+  ItemWithCostingResponseDto,
+  PaginatedItemsWithCostingResponse,
+} from './dto/items-with-costing.dto';
+import { CategoryEntity } from '../category/entities/category.entity';
+import { ItemResponseDto } from '../../common/interfaces/item.interface';
 
 @Injectable()
 export class CostingService {
@@ -35,13 +42,18 @@ export class CostingService {
     private readonly totalCostRepository: Repository<CostingTotalCost>,
     @InjectRepository(ItemEntity)
     private readonly itemRepository: Repository<ItemEntity>,
+    @InjectRepository(CategoryEntity)
+    private readonly categoryRepository: Repository<CategoryEntity>,
     private dataSource: DataSource,
+    //categoryRepository
   ) {}
 
   /**
    * Create a new costing with version control
    */
-  async create(createCostingDto: CreateCostingDto): Promise<CostingResponseDto> {
+  async create(
+    createCostingDto: CreateCostingDto,
+  ): Promise<CostingResponseDto> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -374,6 +386,7 @@ export class CostingService {
 
       // FIX: Handle missing batch calculations gracefully
       const batchCalculations = {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         batch0_5kg: rm.batchCalculations?.['batch0.5kg'] || { cost: 0, kg: 0 },
         batch1kg: rm.batchCalculations?.batch1kg || { cost: 0, kg: 0 },
         batch10kg: rm.batchCalculations?.batch10kg || { cost: 0, kg: 0 },
@@ -457,12 +470,18 @@ export class CostingService {
 
     // FIX: Ensure rawMaterials and additionalCosts are arrays
     if (!Array.isArray(rawMaterials)) {
-      console.error('rawMaterials is not an array in createTotalCosts:', rawMaterials);
+      console.error(
+        'rawMaterials is not an array in createTotalCosts:',
+        rawMaterials,
+      );
       rawMaterials = [];
     }
 
     if (!Array.isArray(additionalCosts)) {
-      console.error('additionalCosts is not an array in createTotalCosts:', additionalCosts);
+      console.error(
+        'additionalCosts is not an array in createTotalCosts:',
+        additionalCosts,
+      );
       additionalCosts = [];
     }
 
@@ -512,8 +531,11 @@ export class CostingService {
         return this.totalCostRepository.create({
           costingId,
           batchSize: batchSizeEnum,
-          cost: typeof data.cost === 'string' ? parseFloat(data.cost) : (data.cost || 0),
-          kg: typeof data.kg === 'string' ? parseFloat(data.kg) : (data.kg || 0),
+          cost:
+            typeof data.cost === 'string'
+              ? parseFloat(data.cost)
+              : data.cost || 0,
+          kg: typeof data.kg === 'string' ? parseFloat(data.kg) : data.kg || 0,
           rawMaterialCost,
           additionalCost,
         });
@@ -529,7 +551,10 @@ export class CostingService {
   ): number {
     // FIX: Add array validation
     if (!Array.isArray(rawMaterials)) {
-      console.error('rawMaterials is not an array in calculateBatchRawMaterialCost:', rawMaterials);
+      console.error(
+        'rawMaterials is not an array in calculateBatchRawMaterialCost:',
+        rawMaterials,
+      );
       return 0;
     }
 
@@ -576,7 +601,10 @@ export class CostingService {
   ): number {
     // FIX: Add array validation
     if (!Array.isArray(additionalCosts)) {
-      console.error('additionalCosts is not an array in calculateBatchAdditionalCost:', additionalCosts);
+      console.error(
+        'additionalCosts is not an array in calculateBatchAdditionalCost:',
+        additionalCosts,
+      );
       return 0;
     }
 
@@ -636,7 +664,10 @@ export class CostingService {
   private calculateTotalPercentage(rawMaterials: RawMaterialDto[]): number {
     // FIX: Add array validation
     if (!Array.isArray(rawMaterials)) {
-      console.error('rawMaterials is not an array in calculateTotalPercentage:', rawMaterials);
+      console.error(
+        'rawMaterials is not an array in calculateTotalPercentage:',
+        rawMaterials,
+      );
       return 0;
     }
 
@@ -648,7 +679,10 @@ export class CostingService {
   ): number {
     // FIX: Add array validation
     if (!Array.isArray(rawMaterials)) {
-      console.error('rawMaterials is not an array in calculateTotalRawMaterialCost:', rawMaterials);
+      console.error(
+        'rawMaterials is not an array in calculateTotalRawMaterialCost:',
+        rawMaterials,
+      );
       return 0;
     }
 
@@ -660,7 +694,10 @@ export class CostingService {
   ): number {
     // FIX: Add array validation
     if (!Array.isArray(additionalCosts)) {
-      console.error('additionalCosts is not an array in calculateTotalAdditionalCost:', additionalCosts);
+      console.error(
+        'additionalCosts is not an array in calculateTotalAdditionalCost:',
+        additionalCosts,
+      );
       return 0;
     }
 
@@ -726,6 +763,344 @@ export class CostingService {
       totalRawMaterialCost: costing.totalRawMaterialCost,
       totalAdditionalCost: costing.totalAdditionalCost,
       totalPercentage: costing.totalPercentage,
+    };
+  }
+
+  /**
+   * Get all items with costing information (paginated)
+   */
+  async findAllItemsWithCosting(
+    query: ItemsWithCostingQueryDto,
+  ): Promise<PaginatedItemsWithCostingResponse> {
+    try {
+      const {
+        includeSuppliers = false,
+        category,
+        search,
+        onlyWithCosting = false,
+        page = 1,
+        limit = 10,
+      } = query;
+
+      // Build base query
+      const itemQuery = this.itemRepository
+        .createQueryBuilder('item')
+        .leftJoinAndSelect(
+          'item.suppliers',
+          'suppliers',
+          includeSuppliers ? '1=1' : '1=0',
+        );
+
+      // Apply filters
+      if (category) {
+        itemQuery.andWhere('item.category = :category', { category });
+      }
+
+      if (search) {
+        itemQuery.andWhere(
+          '(item.description LIKE :search OR item.itemCode LIKE :search OR item.category LIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      // Get total count for pagination
+      const total = await itemQuery.getCount();
+
+      // Apply pagination
+      const skip = (page - 1) * limit;
+      const items = await itemQuery
+        .orderBy('item.itemCode', 'ASC')
+        .skip(skip)
+        .take(limit)
+        .getMany();
+
+      // Get all item IDs
+      const itemIds = items.map((item) => item.id);
+
+      // Get active costings for these items
+      const activeCostings = await this.costingRepository.find({
+        where: {
+          itemId: In(itemIds),
+          isActive: true,
+        },
+        relations: ['rawMaterials', 'additionalCosts', 'totalCosts'],
+      });
+
+      // Create a map of itemId -> latest costing
+      const costingMap = new Map();
+      activeCostings.forEach((costing) => {
+        costingMap.set(costing.itemId, costing);
+      });
+
+      // Filter items if onlyWithCosting is true
+      let filteredItems = items;
+      if (onlyWithCosting) {
+        filteredItems = items.filter((item) => costingMap.has(item.id));
+      }
+
+      // Map to response DTO
+      const data = filteredItems.map((item) =>
+        this.mapToItemWithCostingDto(item, costingMap.get(item.id)),
+      );
+
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPrevPage = page > 1;
+
+      return {
+        data,
+        total: filteredItems.length,
+        page,
+        limit,
+        totalPages,
+        hasNextPage,
+        hasPrevPage,
+      };
+    } catch (error) {
+      console.error('Error finding items with costing:', error);
+      throw new InternalServerErrorException(
+        'Failed to retrieve items with costing information',
+      );
+    }
+  }
+
+  /**
+   * Get items by category with costing information (paginated)
+   */
+  async findItemsByCategoryWithCosting(
+    category: string,
+    query: ItemsWithCostingQueryDto,
+  ): Promise<PaginatedItemsWithCostingResponse> {
+    try {
+      return this.findAllItemsWithCosting({
+        ...query,
+        category,
+      });
+    } catch (error) {
+      console.error('Error finding items by category with costing:', error);
+      throw new InternalServerErrorException(
+        'Failed to retrieve items by category with costing',
+      );
+    }
+  }
+
+  /**
+   * Get single item with costing information
+   */
+  async findItemWithCosting(
+    itemCode: string,
+  ): Promise<ItemWithCostingResponseDto> {
+    try {
+      const item = await this.itemRepository.findOne({
+        where: { itemCode },
+        relations: ['suppliers'],
+      });
+
+      if (!item) {
+        throw new NotFoundException(`Item with code ${itemCode} not found`);
+      }
+
+      // Get active costing for this item
+      const activeCosting = await this.costingRepository.findOne({
+        where: {
+          itemId: item.id,
+          isActive: true,
+        },
+        relations: ['rawMaterials', 'additionalCosts', 'totalCosts'],
+        order: { version: 'DESC' },
+      });
+
+      return this.mapToItemWithCostingDto(item, activeCosting || undefined);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error finding item with costing:', error);
+      throw new InternalServerErrorException(
+        'Failed to retrieve item with costing information',
+      );
+    }
+  }
+
+  /**
+   * Search items with costing information (paginated)
+   */
+  async searchItemsWithCosting(
+    searchTerm: string,
+    query: Omit<ItemsWithCostingQueryDto, 'search'>,
+  ): Promise<PaginatedItemsWithCostingResponse> {
+    try {
+      if (!searchTerm || searchTerm.trim().length === 0) {
+        return {
+          data: [],
+          total: 0,
+          page: query.page || 1,
+          limit: query.limit || 10,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        };
+      }
+
+      return this.findAllItemsWithCosting({
+        ...query,
+        search: searchTerm.trim(),
+      });
+    } catch (error) {
+      console.error('Error searching items with costing:', error);
+      throw new InternalServerErrorException(
+        'Search with costing failed due to server error',
+      );
+    }
+  }
+
+  /**
+   * Get items by multiple category IDs with costing information
+   */
+  async findItemsByCategoryIdsWithCosting(
+    dto: ItemsByCategoriesDto,
+  ): Promise<PaginatedItemsWithCostingResponse> {
+    try {
+      const {
+        categoryIds,
+        includeSuppliers = false,
+        onlyWithCosting = false,
+        page = 1,
+        limit = 10,
+      } = dto;
+
+      if (!categoryIds || categoryIds.length === 0) {
+        throw new BadRequestException('Category IDs array cannot be empty');
+      }
+
+      // Validate that all category IDs exist
+      const categories = await this.categoryRepository.find({
+        where: { id: In(categoryIds) },
+      });
+
+      if (categories.length !== categoryIds.length) {
+        throw new BadRequestException('Some category IDs were not found');
+      }
+
+      // Build query
+      const itemQuery = this.itemRepository
+        .createQueryBuilder('item')
+        .leftJoinAndSelect(
+          'item.suppliers',
+          'suppliers',
+          includeSuppliers ? '1=1' : '1=0',
+        )
+        .where('item.categoryId IN (:...categoryIds)', { categoryIds });
+
+      // Get total count
+      const total = await itemQuery.getCount();
+
+      // Apply pagination
+      const skip = (page - 1) * limit;
+      const items = await itemQuery
+        .orderBy('item.itemCode', 'ASC')
+        .skip(skip)
+        .take(limit)
+        .getMany();
+
+      // Get active costings
+      const itemIds = items.map((item) => item.id);
+      const activeCostings = await this.costingRepository.find({
+        where: {
+          itemId: In(itemIds),
+          isActive: true,
+        },
+        relations: ['rawMaterials', 'additionalCosts', 'totalCosts'],
+      });
+
+      const costingMap = new Map();
+      activeCostings.forEach((costing) => {
+        costingMap.set(costing.itemId, costing);
+      });
+
+      // Filter if onlyWithCosting is true
+      let filteredItems = items;
+      if (onlyWithCosting) {
+        filteredItems = items.filter((item) => costingMap.has(item.id));
+      }
+
+      // Map to response DTO
+      const data = filteredItems.map((item) =>
+        this.mapToItemWithCostingDto(item, costingMap.get(item.id)),
+      );
+
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPrevPage = page > 1;
+
+      return {
+        data,
+        total: filteredItems.length,
+        page,
+        limit,
+        totalPages,
+        hasNextPage,
+        hasPrevPage,
+      };
+    } catch (error) {
+      console.error('Error finding items by category IDs with costing:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Failed to retrieve items by category IDs with costing',
+      );
+    }
+  }
+
+  /**
+   * Map item and costing to response DTO
+   */
+  private mapToItemWithCostingDto(
+    item: ItemEntity,
+    costing?: CostingEntity,
+  ): ItemWithCostingResponseDto {
+    const costingResponse = costing
+      ? this.mapToResponseDto(costing)
+      : undefined;
+
+    return {
+      id: item.id,
+      itemCode: item.itemCode,
+      stockId: item.stockId,
+      description: item.description,
+      category: item.category,
+      categoryId: item.categoryId,
+      units: item.units,
+      price: item.price,
+      altPrice: item.altPrice,
+      currency: item.currency,
+      status: item.status, // Use the item's status directly
+      suppliers: item.suppliers || [],
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      hasCostingRecords: !!costing,
+      latestCostingRecordDetails: costingResponse,
+    };
+  }
+
+
+  private mapItemToResponseDto(item: ItemEntity): ItemResponseDto {
+    return {
+      id: item.id,
+      itemCode: item.itemCode,
+      stockId: item.stockId,
+      description: item.description,
+      category: item.category,
+      categoryId: item.categoryId,
+      units: item.units,
+      price: item.price,
+      altPrice: item.altPrice,
+      currency: item.currency,
+      status: item.status,
+      suppliers: item.suppliers || [],
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
     };
   }
 }

@@ -17,6 +17,12 @@ import { CostingService } from './costing.service';
 import { CreateCostingDto } from './dto/create-costing.dto';
 import { UpdateCostingDto } from './dto/update-costing.dto';
 import { CostingResponseDto } from './dto/costing-response.dto';
+import {
+  ItemWithCostingResponseDto,
+  PaginatedItemsWithCostingResponse,
+} from './dto/items-with-costing.dto';
+import { ItemsWithCostingQueryDto } from './dto/items-with-costing-query.dto';
+import { ItemsByCategoriesDto } from './dto/ItemsByCategoriesDto';
 
 @Controller('costing')
 export class CostingController {
@@ -244,10 +250,9 @@ export class CostingController {
         try {
           const costing = await this.costingService.findOne(costingId);
           if (costing.isActive) {
-            await this.costingService.update(
-              costingId,
-              { isActive: false } as UpdateCostingDto,
-            );
+            await this.costingService.update(costingId, {
+              isActive: false,
+            } as UpdateCostingDto);
             deactivatedCount++;
           }
         } catch (error) {
@@ -349,5 +354,87 @@ export class CostingController {
       timestamp: new Date().toISOString(),
       service: 'Costing Service',
     };
+  }
+
+  @Get('items/co')
+  async findAllItemsWithCosting(
+    @Query() query: ItemsWithCostingQueryDto,
+  ): Promise<{ data: PaginatedItemsWithCostingResponse }> {
+    try {
+      const result = await this.costingService.findAllItemsWithCosting(query);
+      return { data: result };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get items by category with costing information (paginated)
+   */
+  @Get('items/category/:category')
+  async findItemsByCategoryWithCosting(
+    @Param('category') category: string,
+    @Query() query: Omit<ItemsWithCostingQueryDto, 'category'>,
+  ): Promise<{ data: PaginatedItemsWithCostingResponse }> {
+    try {
+      const result = await this.costingService.findItemsByCategoryWithCosting(
+        category,
+        query,
+      );
+      return { data: result };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get single item with costing information
+   */
+  @Get('items/:itemCode')
+  async findItemWithCosting(
+    @Param('itemCode') itemCode: string,
+  ): Promise<{ data: ItemWithCostingResponseDto }> {
+    try {
+      const item = await this.costingService.findItemWithCosting(itemCode);
+      return { data: item };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Search items with costing information (paginated)
+   */
+  @Get('items/search/:term')
+  async searchItemsWithCosting(
+    @Param('term') searchTerm: string,
+    @Query() query: Omit<ItemsWithCostingQueryDto, 'search'>,
+  ): Promise<{ data: PaginatedItemsWithCostingResponse }> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const result = await this.costingService.searchItemsWithCosting(
+        searchTerm,
+        query,
+      );
+      return { data: result };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get items by multiple category IDs with costing information (paginated)
+   */
+  @Post('items/by-categories')
+  async findItemsByCategoryIdsWithCosting(
+    @Body() dto: ItemsByCategoriesDto,
+  ): Promise<{ data: PaginatedItemsWithCostingResponse }> {
+    try {
+      const result =
+        await this.costingService.findItemsByCategoryIdsWithCosting(dto);
+      return { data: result };
+    } catch (error) {
+      throw error;
+    }
   }
 }

@@ -12,6 +12,7 @@ import { ComplaintModule } from './modules/complaint/complaint.module';
 import { AttachmentModule } from './modules/attachment/attachment.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { CostingModule } from './modules/costing/costing.module';
+import { TasksModule } from './modules/tasks/tasks.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { CostingModule } from './modules/costing/costing.module';
     SuppliersModule,
     CostingModule,
     CategoryModule,
+    TasksModule,
   ],
   controllers: [],
   providers: [],
