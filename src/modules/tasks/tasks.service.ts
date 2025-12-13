@@ -471,6 +471,7 @@ export class TasksService {
     this.logger.log(`deleteTask - Task deleted successfully: ${identifier}`);
   }
 
+  
   async updateTaskPosition(
     taskId: string,
     dto: TaskPositionDto,
