@@ -16,7 +16,6 @@ import { CostingRawMaterial } from './costing-raw-material.entity';
 import { CostingAdditionalCost } from './costing-additional-cost.entity';
 import { CostingTotalCost } from './costing-total-cost.entity';
 
-
 @Entity('costings')
 export class CostingEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -79,10 +78,10 @@ export class CostingEntity {
   })
   status: Status;
 
-  @Column('decimal', { precision: 10, scale: 4, default: 0 })
+  @Column('decimal', { precision: 18, scale: 4, default: 0 })
   totalRawMaterialCost: number;
 
-  @Column('decimal', { precision: 10, scale: 4, default: 0 })
+  @Column('decimal', { precision: 18, scale: 4, default: 0 })
   totalAdditionalCost: number;
 
   @Column('decimal', { precision: 10, scale: 4, default: 0 })

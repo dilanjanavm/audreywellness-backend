@@ -23,6 +23,10 @@ import {
 } from './dto/items-with-costing.dto';
 import { ItemsWithCostingQueryDto } from './dto/items-with-costing-query.dto';
 import { ItemsByCategoriesDto } from './dto/ItemsByCategoriesDto';
+import {
+  PaginatedCostedProductsResponse,
+  ProductCostHistoryDto,
+} from './dto/cost-history.dto';
 
 @Controller('costing')
 export class CostingController {
@@ -411,7 +415,6 @@ export class CostingController {
     @Query() query: Omit<ItemsWithCostingQueryDto, 'search'>,
   ): Promise<{ data: PaginatedItemsWithCostingResponse }> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const result = await this.costingService.searchItemsWithCosting(
         searchTerm,
         query,
@@ -433,6 +436,44 @@ export class CostingController {
       const result =
         await this.costingService.findItemsByCategoryIdsWithCosting(dto);
       return { data: result };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get all products that have costing records (costed products)
+   */
+  @Get('products/costed')
+  async getCostedProducts(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number = 10,
+    @Query('search') search?: string,
+    @Query('category') category?: string,
+  ): Promise<{ data: PaginatedCostedProductsResponse }> {
+    try {
+      const result = await this.costingService.getCostedProducts(
+        page,
+        limit,
+        search,
+        category,
+      );
+      return { data: result };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get detailed cost history for a product with cost change tracking
+   */
+  @Get('products/:itemId/cost-history')
+  async getProductCostHistory(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+  ): Promise<{ data: ProductCostHistoryDto }> {
+    try {
+      const history = await this.costingService.getProductCostHistory(itemId);
+      return { data: history };
     } catch (error) {
       throw error;
     }

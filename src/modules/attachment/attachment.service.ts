@@ -26,8 +26,6 @@ export class AttachmentService {
     private readonly fileStorageService: FileStorageService,
   ) {}
 
-
-
   // Generic file upload without entity association
   async uploadFile(
     file: Express.Multer.File,
@@ -214,7 +212,6 @@ export class AttachmentService {
       throw new InternalServerErrorException('Failed to retrieve uploads');
     }
   }
-
 
   mapToResponseDto(attachment: AttachmentEntity): AttachmentResponseDto {
     const uploadedBy: UploadedByUser = {

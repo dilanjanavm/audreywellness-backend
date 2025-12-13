@@ -155,7 +155,9 @@ export class SuppliersService {
       queryBuilder.andWhere('supplier.isActive = :isActive', { isActive });
     } else {
       // Default to active suppliers only
-      queryBuilder.andWhere('supplier.isActive = :isActive', { isActive: true });
+      queryBuilder.andWhere('supplier.isActive = :isActive', {
+        isActive: true,
+      });
     }
 
     // Apply search filter
@@ -394,13 +396,12 @@ export class SuppliersService {
       const readableStream = new stream.PassThrough();
       readableStream.end(fileBuffer);
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       readableStream
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
         .pipe(csv())
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
         .on('data', (data) => results.push(data))
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
         .on('end', async () => {
           let successful = 0;
           let failed = 0;
@@ -419,15 +420,15 @@ export class SuppliersService {
                 name: row.supp_name?.trim() || `Supplier ${index + 1}`,
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
                 reference: row.supp_ref?.trim() || `REF-${index + 1}`,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                 address: this.cleanAddress(row.address || row.supp_address),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                 phone: this.cleanPhone(row.phone || row.phone2),
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
                 contactPerson: row.contact_person?.trim(),
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
                 email: row.email?.trim(),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                 phone2: this.cleanPhone(row.phone2),
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
                 fax: row.fax?.trim(),
@@ -488,10 +489,9 @@ export class SuppliersService {
             errors,
           });
         })
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
         .on('error', (error) => {
           reject(
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             new BadRequestException(`CSV parsing error: ${error.message}`),
           );
         });

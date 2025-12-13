@@ -443,7 +443,6 @@ export class ItemManagementController {
         }
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const items = await this.itemService.findByCategoryIds(body.categoryIds);
       return { data: items };
     } catch (error) {

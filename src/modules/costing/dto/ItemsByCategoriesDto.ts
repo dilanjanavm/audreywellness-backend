@@ -1,5 +1,12 @@
 // src/modules/costing/dto/items-by-categories.dto.ts
-import { IsArray, IsOptional, IsBoolean, IsNumber, Min, ArrayNotEmpty } from 'class-validator';
+import {
+  IsArray,
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+  Min,
+  ArrayNotEmpty,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ItemsByCategoriesDto {

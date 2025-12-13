@@ -28,6 +28,13 @@ import {
 } from './dto/items-with-costing.dto';
 import { CategoryEntity } from '../category/entities/category.entity';
 import { ItemResponseDto } from '../../common/interfaces/item.interface';
+import {
+  CostedProductDto,
+  PaginatedCostedProductsResponse,
+  ProductCostHistoryDto,
+  CostHistoryEntryDto,
+  CostChangeDto,
+} from './dto/cost-history.dto';
 
 @Injectable()
 export class CostingService {
@@ -1084,7 +1091,6 @@ export class CostingService {
     };
   }
 
-
   private mapItemToResponseDto(item: ItemEntity): ItemResponseDto {
     return {
       id: item.id,
@@ -1102,5 +1108,281 @@ export class CostingService {
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     };
+  }
+
+  /**
+   * Get all products that have costing records (costed products)
+   */
+  async getCostedProducts(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    category?: string,
+  ): Promise<PaginatedCostedProductsResponse> {
+    try {
+      // First, get distinct item IDs that have costing records
+      const costingsWithItems = await this.costingRepository
+        .createQueryBuilder('costing')
+        .select('DISTINCT costing.itemId', 'itemId')
+        .getRawMany();
+
+      const itemIds = costingsWithItems.map((row) => row.itemId);
+
+      if (itemIds.length === 0) {
+        return {
+          data: [],
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        };
+      }
+
+      // Build query for items
+      const itemQuery = this.itemRepository
+        .createQueryBuilder('item')
+        .where('item.id IN (:...itemIds)', { itemIds });
+
+      // Apply filters
+      if (category) {
+        itemQuery.andWhere('item.category = :category', { category });
+      }
+
+      if (search) {
+        itemQuery.andWhere(
+          '(item.description LIKE :search OR item.itemCode LIKE :search OR item.category LIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      // Get total count
+      const total = await itemQuery.getCount();
+
+      // Apply pagination
+      const skip = (page - 1) * limit;
+      const items = await itemQuery
+        .orderBy('item.itemCode', 'ASC')
+        .skip(skip)
+        .take(limit)
+        .getMany();
+
+      // Get filtered item IDs for fetching costings
+      const filteredItemIds = items.map((item) => item.id);
+
+      // Get all costings for these items
+      const allCostings = await this.costingRepository.find({
+        where: {
+          itemId: In(filteredItemIds),
+        },
+        relations: ['rawMaterials', 'additionalCosts', 'totalCosts'],
+        order: { version: 'DESC' },
+      });
+
+      // Get active costings
+      const activeCostings = await this.costingRepository.find({
+        where: {
+          itemId: In(filteredItemIds),
+          isActive: true,
+        },
+        relations: ['rawMaterials', 'additionalCosts', 'totalCosts'],
+      });
+
+      // Create maps for efficient lookup
+      const costingMap = new Map<string, CostingEntity[]>();
+      const activeCostingMap = new Map<string, CostingEntity>();
+      const latestCostingMap = new Map<string, CostingEntity>();
+
+      allCostings.forEach((costing) => {
+        if (!costingMap.has(costing.itemId)) {
+          costingMap.set(costing.itemId, []);
+        }
+        costingMap.get(costing.itemId)!.push(costing);
+
+        // Track latest costing (highest version)
+        const existing = latestCostingMap.get(costing.itemId);
+        if (!existing || costing.version > existing.version) {
+          latestCostingMap.set(costing.itemId, costing);
+        }
+      });
+
+      activeCostings.forEach((costing) => {
+        activeCostingMap.set(costing.itemId, costing);
+      });
+
+      // Map to response DTO
+      const data: CostedProductDto[] = items.map((item) => {
+        const itemCostings = costingMap.get(item.id) || [];
+        const activeCosting = activeCostingMap.get(item.id);
+        const latestCosting = latestCostingMap.get(item.id);
+
+        return {
+          itemId: item.id,
+          itemCode: item.itemCode,
+          itemName: item.description,
+          category: item.category,
+          categoryId: item.categoryId,
+          units: item.units,
+          price: item.price,
+          currency: item.currency,
+          status: item.status,
+          hasActiveCosting: !!activeCosting,
+          activeCostingVersion: activeCosting?.version,
+          totalCostingVersions: itemCostings.length,
+          latestCosting: latestCosting
+            ? this.mapToResponseDto(latestCosting)
+            : undefined,
+          lastCostUpdate: latestCosting?.updatedAt,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        };
+      });
+
+      const totalPages = Math.ceil(total / limit);
+      const hasNextPage = page < totalPages;
+      const hasPrevPage = page > 1;
+
+      return {
+        data,
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage,
+        hasPrevPage,
+      };
+    } catch (error) {
+      console.error('Error getting costed products:', error);
+      throw new InternalServerErrorException(
+        'Failed to retrieve costed products',
+      );
+    }
+  }
+
+  /**
+   * Get detailed cost history for a product
+   */
+  async getProductCostHistory(
+    itemId: string,
+  ): Promise<ProductCostHistoryDto> {
+    try {
+      // Validate item exists
+      const item = await this.itemRepository.findOne({
+        where: { id: itemId },
+      });
+
+      if (!item) {
+        throw new NotFoundException(`Item with ID ${itemId} not found`);
+      }
+
+      // Get all costings for this item, ordered by version
+      const costings = await this.costingRepository.find({
+        where: { itemId },
+        relations: ['rawMaterials', 'additionalCosts', 'totalCosts'],
+        order: { version: 'ASC' },
+      });
+
+      if (costings.length === 0) {
+        throw new NotFoundException(
+          `No costing records found for item ${itemId}`,
+        );
+      }
+
+      // Build history entries with cost changes
+      const historyEntries: CostHistoryEntryDto[] = costings.map(
+        (costing, index) => {
+          const costingDto = this.mapToResponseDto(costing);
+          let costChanges: CostChangeDto[] | undefined;
+
+          // Calculate cost changes compared to previous version
+          if (index > 0) {
+            const previousCosting = costings[index - 1];
+            costChanges = this.calculateCostChanges(
+              previousCosting,
+              costing,
+            );
+          }
+
+          return {
+            costing: costingDto,
+            costChanges,
+            isActive: costing.isActive,
+            version: costing.version,
+            updatedAt: costing.updatedAt,
+            createdAt: costing.createdAt,
+          };
+        },
+      );
+
+      // Find active version
+      const activeCosting = costings.find((c) => c.isActive);
+
+      // Get earliest and latest dates
+      const dates = costings.map((c) => c.createdAt);
+      const earliestDate = new Date(Math.min(...dates.map((d) => d.getTime())));
+      const latestDate = new Date(Math.max(...dates.map((d) => d.getTime())));
+
+      return {
+        itemId: item.id,
+        itemCode: item.itemCode,
+        itemName: item.description,
+        totalVersions: costings.length,
+        currentActiveVersion: activeCosting?.version,
+        history: historyEntries,
+        createdAt: earliestDate,
+        lastUpdated: latestDate,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error getting product cost history:', error);
+      throw new InternalServerErrorException(
+        'Failed to retrieve product cost history',
+      );
+    }
+  }
+
+  /**
+   * Calculate cost changes between two costing versions
+   */
+  private calculateCostChanges(
+    previousCosting: CostingEntity,
+    currentCosting: CostingEntity,
+  ): CostChangeDto[] {
+    const costChanges: CostChangeDto[] = [];
+
+    // Get all unique batch sizes from both costings
+    const batchSizes = new Set<BatchSize>();
+    previousCosting.totalCosts?.forEach((tc) => batchSizes.add(tc.batchSize));
+    currentCosting.totalCosts?.forEach((tc) => batchSizes.add(tc.batchSize));
+
+    batchSizes.forEach((batchSize) => {
+      const previousTotalCost = previousCosting.totalCosts?.find(
+        (tc) => tc.batchSize === batchSize,
+      );
+      const currentTotalCost = currentCosting.totalCosts?.find(
+        (tc) => tc.batchSize === batchSize,
+      );
+
+      if (previousTotalCost && currentTotalCost) {
+        const previousCost = previousTotalCost.cost;
+        const currentCost = currentTotalCost.cost;
+        const costDifference = currentCost - previousCost;
+        const percentageChange =
+          previousCost > 0 ? (costDifference / previousCost) * 100 : 0;
+
+        costChanges.push({
+          batchSize,
+          previousCost,
+          currentCost,
+          costDifference,
+          percentageChange: parseFloat(percentageChange.toFixed(2)),
+        });
+      }
+    });
+
+    return costChanges;
   }
 }
