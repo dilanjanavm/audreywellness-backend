@@ -17,13 +17,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: any) {
     // FIX: Return the expected user object with roles
+    // Ensure roles is always an array for RolesGuard compatibility
+    const roles = payload.roles || (payload.role ? [payload.role] : []);
+    
     return {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       userId: payload.sub,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       email: payload.email,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      roles: payload.roles || [payload.role], // Handle both formats
+      roles: Array.isArray(roles) ? roles : [roles], // Ensure it's always an array
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      role: roles[0] || payload.role, // Also include single role for backwards compatibility
     };
   }
 }

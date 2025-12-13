@@ -1,11 +1,33 @@
-// src/database/seed/seed.module.ts
+// src/database/seeds/seed.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SeedService } from './seed.service';
 import { User } from '../../modules/users/user.entity';
+import { Role } from '../../modules/roles/entities/role.entity';
+import { Permission } from '../../modules/permissions/entities/permission.entity';
+import { RolePermission } from '../../modules/role-permissions/entities/role-permission.entity';
+import databaseConfig from '../../config/database.config';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User])],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [databaseConfig],
+    }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        const dbConfig = configService.get('database');
+        if (!dbConfig) {
+          throw new Error('Database configuration not found');
+        }
+        return dbConfig;
+      },
+      inject: [ConfigService],
+    }),
+    TypeOrmModule.forFeature([User, Role, Permission, RolePermission]),
+  ],
   providers: [SeedService],
   exports: [SeedService],
 })

@@ -14,6 +14,10 @@ import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { CostingModule } from './modules/costing/costing.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
+import { EmailModule } from './modules/email/email.module';
+import { RolesModule } from './modules/roles/roles.module';
+import { PermissionsModule } from './modules/permissions/permissions.module';
+import { RolePermissionsModule } from './modules/role-permissions/role-permissions.module';
 
 @Module({
   imports: [
@@ -43,6 +47,10 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
     CostingModule,
     CategoryModule,
     TasksModule,
+    EmailModule,
+    RolesModule,
+    PermissionsModule,
+    RolePermissionsModule,
   ],
   controllers: [],
   providers: [],

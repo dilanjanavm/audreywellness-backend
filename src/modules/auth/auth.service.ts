@@ -2,6 +2,7 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
+import { UserRole } from '../../common/enums/user-role.enum';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -41,10 +42,40 @@ export class AuthService {
   async login(user: any) {
     console.log('🎯 Login service - user:', user.email);
 
+    // Handle both legacy role and new role structure
+    // Priority: legacyRole > role.code (mapped to UserRole) > role (fallback)
+    let roleCode: string = UserRole.USER; // Default fallback
+    
+    if (user.legacyRole) {
+      // Use legacy role if it exists (already in UserRole enum format)
+      roleCode = user.legacyRole;
+    } else if (user.role?.code) {
+      // Map Role.code to UserRole enum value
+      // Convert Role.code (e.g., "ADMIN", "MANAGER") to UserRole enum format (e.g., "admin", "manager")
+      const normalizedCode = user.role.code.toLowerCase();
+      
+      // Check if it matches a UserRole enum value
+      const userRoleValues = Object.values(UserRole);
+      if (userRoleValues.includes(normalizedCode as UserRole)) {
+        roleCode = normalizedCode;
+      } else {
+        // If Role.code doesn't match UserRole enum, use the code as-is
+        // But still normalize to lowercase for consistency
+        roleCode = normalizedCode;
+        console.warn(`Role code "${user.role.code}" does not match UserRole enum, using as-is`);
+      }
+    } else if (user.role) {
+      // Fallback: if role is a string, use it directly
+      roleCode = typeof user.role === 'string' ? user.role.toLowerCase() : UserRole.USER;
+    }
+    
+    const roleId = user.roleId || null;
+
     const payload = {
       sub: user.id,
       email: user.email,
-      roles: [user.role],
+      roles: [roleCode],
+      roleId: roleId,
     };
 
     const access_token = this.jwtService.sign(payload);
@@ -56,7 +87,9 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
+        userName: user.userName,
+        role: roleCode,
+        roleId: roleId,
       },
     };
   }

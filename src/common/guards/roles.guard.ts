@@ -25,7 +25,15 @@ export class RolesGuard implements CanActivate {
 
     // FIX: Handle both 'role' (string) and 'roles' (array) formats
     const userRoles = user.roles || [user.role];
+    
+    // Normalize role comparison - convert to lowercase for case-insensitive matching
+    const normalizedUserRoles = userRoles.map((r: string) => 
+      typeof r === 'string' ? r.toLowerCase() : r
+    );
+    const normalizedRequiredRoles = requiredRoles.map((r) => r.toLowerCase());
 
-    return requiredRoles.some((role) => userRoles.includes(role));
+    return normalizedRequiredRoles.some((role) => 
+      normalizedUserRoles.includes(role)
+    );
   }
 }
