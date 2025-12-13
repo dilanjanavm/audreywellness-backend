@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import databaseConfig from './config/database.config';
@@ -13,6 +13,7 @@ import { AttachmentModule } from './modules/attachment/attachment.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { CostingModule } from './modules/costing/costing.module';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 
 @Module({
   imports: [
@@ -46,4 +47,8 @@ import { TasksModule } from './modules/tasks/tasks.module';
   controllers: [],
   providers: [],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestLoggerMiddleware).forRoutes('*');
+  }
+}

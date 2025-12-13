@@ -23,7 +23,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       email: payload.email,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      roles: payload.roles || [payload.role] // Handle both formats
+      roles: payload.roles || [payload.role], // Handle both formats
     };
   }
 }

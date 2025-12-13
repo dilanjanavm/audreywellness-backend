@@ -1,5 +1,11 @@
 // src/modules/costing/dto/items-with-costing-query.dto.ts
-import { IsOptional, IsBoolean, IsString, IsNumber, Min } from 'class-validator';
+import {
+  IsOptional,
+  IsBoolean,
+  IsString,
+  IsNumber,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ItemsWithCostingQueryDto {

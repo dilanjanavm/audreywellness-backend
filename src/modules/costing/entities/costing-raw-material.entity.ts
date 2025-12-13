@@ -38,7 +38,7 @@ export class CostingRawMaterial {
   @Column('decimal', { precision: 10, scale: 4 })
   percentage: number;
 
-  @Column('decimal', { precision: 10, scale: 2 })
+  @Column('decimal', { precision: 18, scale: 2 })
   unitPrice: number;
 
   @Column()
@@ -56,7 +56,7 @@ export class CostingRawMaterial {
   @Column()
   units: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
+  @Column('decimal', { precision: 18, scale: 2 })
   amountNeeded: number;
 
   // Store batch calculations as JSON

@@ -62,7 +62,7 @@ export class CustomerService {
         `Customer with phone ${createCustomerDto.smsPhone} already exists`,
       );
     }
-    
+
     // Check if S_No already exists
     const existingCustomerBySNo = await this.customerRepository.findOne({
       where: { sNo: createCustomerDto.sNo },
@@ -454,10 +454,8 @@ export class CustomerService {
 
       const stream = Readable.from(fileBuffer.toString());
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call
       const parser = parse({
         columns: (header) =>
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-return,@typescript-eslint/no-unsafe-member-access
           header.map((column) => {
             // Map CSV headers to your entity fields
             const columnMapping: { [key: string]: string } = {
@@ -476,7 +474,7 @@ export class CustomerService {
               Status: 'status',
               'Sales Group': 'salesGroup',
             };
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return,@typescript-eslint/no-unsafe-member-access
+
             return columnMapping[column] || column;
           }),
         delimiter: ',',
@@ -487,11 +485,10 @@ export class CustomerService {
         escape: '"',
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       stream
 
         .pipe(parser)
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
         .on('data', (record) => {
           // Skip empty rows
           if (
@@ -503,9 +500,9 @@ export class CustomerService {
             records.push(record);
           }
         })
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
         .on('end', () => resolve(records))
-        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors,@typescript-eslint/no-unsafe-member-access
+
         .on('error', (error) => reject(error));
     });
   }

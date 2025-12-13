@@ -5,7 +5,9 @@ import {
   IsOptional,
   IsBoolean,
   IsPhoneNumber,
-  MinLength, IsArray, IsUUID,
+  MinLength,
+  IsArray,
+  IsUUID,
 } from 'class-validator';
 
 export class CreateSupplierDto {

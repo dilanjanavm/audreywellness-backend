@@ -7,9 +7,7 @@ import { FileStorageService } from './file-storage.service';
 import { AttachmentEntity } from './entities/attachment.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([AttachmentEntity]),
-  ],
+  imports: [TypeOrmModule.forFeature([AttachmentEntity])],
   controllers: [AttachmentController],
   providers: [AttachmentService, FileStorageService],
   exports: [AttachmentService, FileStorageService],

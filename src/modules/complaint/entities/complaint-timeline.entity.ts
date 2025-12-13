@@ -17,7 +17,6 @@ export class ComplaintTimelineEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   @ManyToOne(() => ComplaintEntity, (complaint) => complaint.timelineEntries)
   complaint: ComplaintEntity;
 

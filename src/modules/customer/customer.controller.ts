@@ -11,7 +11,10 @@ import {
   UseGuards,
   ParseUUIDPipe,
   DefaultValuePipe,
-  ParseIntPipe, UseInterceptors, UploadedFile, BadRequestException,
+  ParseIntPipe,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -46,7 +49,6 @@ export class CustomerController {
     @UploadedFile() file: Express.Multer.File,
   ): Promise<CsvImportResponseDto> {
     if (!file) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       throw new BadRequestException('No file uploaded');
     }
 
@@ -91,9 +93,9 @@ export class CustomerController {
     const filters: customerInterface.CustomerSearchFilters = {
       searchTerm,
       customerType,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       salesType,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       status,
       cityArea,
       salesGroup,
