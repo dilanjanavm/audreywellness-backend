@@ -645,7 +645,7 @@ export class ItemManagementService {
   }
 
   /**
-   * Find items by category
+   * Find items by category (name) - legacy method
    */
   async findByCategory(category: string): Promise<ItemResponseDto[]> {
     try {
@@ -660,6 +660,100 @@ export class ItemManagementService {
       throw new InternalServerErrorException(
         'Failed to retrieve items by category',
       );
+    }
+  }
+
+  /**
+   * Find items by category ID (UUID)
+   */
+  async findByCategoryId(categoryId: string): Promise<ItemResponseDto[]> {
+    try {
+      // Validate category exists
+      const category = await this.categoryRepository.findOne({
+        where: { id: categoryId },
+      });
+
+      if (!category) {
+        throw new NotFoundException(`Category with ID ${categoryId} not found`);
+      }
+
+      const items = await this.itemRepository.find({
+        where: { categoryId },
+        order: { itemCode: 'ASC' },
+      });
+
+      return items.map((item) => this.mapToResponseDto(item));
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error finding items by category ID:', error);
+      throw new InternalServerErrorException(
+        'Failed to retrieve items by category ID',
+      );
+    }
+  }
+
+  /**
+   * Find items with filters (search and category)
+   */
+  async findWithFilters(
+    search?: string,
+    categoryId?: string,
+    includeSuppliers: boolean = false,
+  ): Promise<ItemResponseDto[]> {
+    try {
+      // If no filters provided, return all items
+      if (!search && !categoryId) {
+        return this.findAll(includeSuppliers);
+      }
+
+      const queryBuilder = this.itemRepository.createQueryBuilder('item');
+
+      let hasWhereClause = false;
+
+      // Add search filter
+      if (search && search.trim().length > 0) {
+        const searchTerm = `%${search.trim()}%`;
+        queryBuilder.where(
+          '(item.description LIKE :search OR item.itemCode LIKE :search OR item.category LIKE :search)',
+          { search: searchTerm },
+        );
+        hasWhereClause = true;
+      }
+
+      // Add category filter (by categoryId UUID)
+      if (categoryId) {
+        // Validate category exists
+        const category = await this.categoryRepository.findOne({
+          where: { id: categoryId },
+        });
+        if (!category) {
+          throw new NotFoundException(`Category with ID ${categoryId} not found`);
+        }
+
+        if (hasWhereClause) {
+          queryBuilder.andWhere('item.categoryId = :categoryId', { categoryId });
+        } else {
+          queryBuilder.where('item.categoryId = :categoryId', { categoryId });
+        }
+      }
+
+      // Include suppliers if requested
+      if (includeSuppliers) {
+        queryBuilder.leftJoinAndSelect('item.suppliers', 'suppliers');
+      }
+
+      queryBuilder.orderBy('item.itemCode', 'ASC');
+
+      const items = await queryBuilder.getMany();
+      return items.map((item) => this.mapToResponseDto(item));
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error finding items with filters:', error);
+      throw new InternalServerErrorException('Failed to retrieve items with filters');
     }
   }
 

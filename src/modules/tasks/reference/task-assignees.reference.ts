@@ -4,19 +4,16 @@ export const TASK_ASSIGNEE_REFERENCE: Record<string, TaskAssigneeProfile> = {
   'tonya-noble': {
     id: 'tonya-noble',
     name: 'Tonya Noble',
-    avatar: 'avatar-10.jpg',
     role: 'Project Manager',
   },
   'ian-clarkson': {
     id: 'ian-clarkson',
     name: 'Ian Clarkson',
-    avatar: 'avatar-12.jpg',
     role: 'Product Designer',
   },
   'mira-devon': {
     id: 'mira-devon',
     name: 'Mira Devon',
-    avatar: 'avatar-08.jpg',
     role: 'Operations Lead',
   },
 };

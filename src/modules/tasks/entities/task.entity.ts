@@ -4,12 +4,16 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   RelationId,
   UpdateDateColumn,
 } from 'typeorm';
 import { TaskPhaseEntity } from './task-phase.entity';
 import { TaskPriority, TaskStatus } from '../../../common/enums/task.enum';
+import { User } from '../../users/user.entity';
+import { CostingEntity } from '../../costing/entities/costing.entity';
+import { TaskCommentEntity } from './task-comment.entity';
 
 @Entity('tasks')
 export class TaskEntity {
@@ -51,20 +55,56 @@ export class TaskEntity {
   @Column({ name: 'due_date', type: 'datetime', nullable: true })
   dueDate?: Date;
 
+  // User assignment relation (NEW)
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'assigned_user_id' })
+  assignedUser?: User;
+
+  @Column({ name: 'assigned_user_id', nullable: true })
+  assignedUserId?: string;
+
+  // Keep existing assignee fields for backward compatibility
   @Column({ name: 'assignee_id', nullable: true })
   assigneeId?: string;
 
   @Column({ name: 'assignee_name', nullable: true })
   assigneeName?: string;
 
-  @Column({ name: 'assignee_avatar', nullable: true })
-  assigneeAvatar?: string;
-
   @Column({ name: 'assignee_role', nullable: true })
   assigneeRole?: string;
 
+  // Costed product assignment relation (NEW)
+  @ManyToOne(() => CostingEntity, { nullable: true })
+  @JoinColumn({ name: 'costing_id' })
+  costing?: CostingEntity;
+
+  @Column({ name: 'costing_id', nullable: true })
+  costingId?: string;
+
+  // Batch size and raw materials (NEW)
+  @Column({ nullable: true })
+  batchSize?: string;
+
+  @Column({ type: 'json', nullable: true })
+  rawMaterials?: Array<{
+    rawMaterialId: string;
+    rawMaterialName: string;
+    percentage: string;
+    unitPrice: string;
+    units: string;
+    supplier: string;
+    category: string;
+    kg: number;
+    cost: number;
+  }>;
+
   @Column({ type: 'int', unsigned: true, default: 0 })
-  comments: number;
+  comments: number; // Legacy count field
+
+  @OneToMany(() => TaskCommentEntity, (comment) => comment.task, {
+    cascade: true,
+  })
+  commentList?: TaskCommentEntity[];
 
   @Column({ type: 'int', unsigned: true, default: 0 })
   views: number;

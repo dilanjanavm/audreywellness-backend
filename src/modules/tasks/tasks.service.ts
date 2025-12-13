@@ -18,12 +18,19 @@ import {
 } from '../../common/interfaces/task.interface';
 import { TaskPhaseEntity } from './entities/task-phase.entity';
 import { TaskEntity } from './entities/task.entity';
+import { TaskCommentEntity } from './entities/task-comment.entity';
 import { TaskStatus } from '../../common/enums/task.enum';
 import {
   TASK_STATUS_IDS,
   TASK_STATUS_REFERENCE,
 } from './constants/task-status.reference';
 import { resolveAssigneeProfile } from './reference/task-assignees.reference';
+import { User } from '../users/user.entity';
+import { CostingEntity } from '../costing/entities/costing.entity';
+import {
+  CreateTaskCommentDto,
+  TaskCommentResponseDto,
+} from '../../common/interfaces/task.interface';
 
 @Injectable()
 export class TasksService {
@@ -34,6 +41,12 @@ export class TasksService {
     private readonly phaseRepository: Repository<TaskPhaseEntity>,
     @InjectRepository(TaskEntity)
     private readonly taskRepository: Repository<TaskEntity>,
+    @InjectRepository(TaskCommentEntity)
+    private readonly commentRepository: Repository<TaskCommentEntity>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(CostingEntity)
+    private readonly costingRepository: Repository<CostingEntity>,
   ) {
     this.logger.log('TasksService initialized');
   }
@@ -41,7 +54,13 @@ export class TasksService {
   async listPhases(includeTasks = false): Promise<PhaseResponseDto[]> {
     const phases = await this.phaseRepository.find({
       order: { order: 'ASC', createdAt: 'ASC' },
-      relations: includeTasks ? ['tasks'] : [],
+      relations: includeTasks
+        ? [
+            'tasks',
+            'tasks.assignedUser',
+            'tasks.costing',
+          ]
+        : [],
     });
 
     const taskCounts = await this.getPhaseTaskCountMap();
@@ -215,6 +234,8 @@ export class TasksService {
     }
 
     const tasks = await qb
+      .leftJoinAndSelect('task.assignedUser', 'assignedUser')
+      .leftJoinAndSelect('task.costing', 'costing')
       .orderBy(this.buildStatusOrderExpression(phase.statuses), 'ASC')
       .addOrderBy('task.order_index', 'ASC')
       .getMany();
@@ -316,7 +337,41 @@ export class TasksService {
       this.logger.debug(`createTask - Shifting task orders for phase ${phase.id}, status ${dto.status}, order ${order}`);
       await this.shiftTaskOrders(phase.id, dto.status, order);
 
-      // Resolve assignee profile
+      // Validate and load assigned user if provided
+      let assignedUser: User | undefined;
+      if (dto.assignedUserId) {
+        this.logger.debug(`createTask - Validating assigned user: ${dto.assignedUserId}`);
+        const user = await this.userRepository.findOne({
+          where: { id: dto.assignedUserId },
+        });
+        if (!user) {
+          throw new NotFoundException(`User with ID ${dto.assignedUserId} not found`);
+        }
+        if (!user.isActive) {
+          throw new BadRequestException(`User ${dto.assignedUserId} is not active`);
+        }
+        assignedUser = user;
+        this.logger.debug(`createTask - Assigned user validated: ${assignedUser.userName} (${assignedUser.id})`);
+      }
+
+      // Validate and load costing if provided
+      let costing: CostingEntity | undefined;
+      if (dto.costingId) {
+        this.logger.debug(`createTask - Validating costing: ${dto.costingId}`);
+        const costingEntity = await this.costingRepository.findOne({
+          where: { id: dto.costingId },
+        });
+        if (!costingEntity) {
+          throw new NotFoundException(`Costing with ID ${dto.costingId} not found`);
+        }
+        if (!costingEntity.isActive) {
+          throw new BadRequestException(`Costing ${dto.costingId} is not active`);
+        }
+        costing = costingEntity;
+        this.logger.debug(`createTask - Costing validated: ${costing.itemName} (${costing.id})`);
+      }
+
+      // Resolve assignee profile (legacy support)
       this.logger.debug(`createTask - Resolving assignee: ${dto.assignee || 'none'}`);
       const assigneeProfile = resolveAssigneeProfile(dto.assignee ?? undefined);
       if (assigneeProfile) {
@@ -336,10 +391,16 @@ export class TasksService {
         comments: dto.comments ?? 0,
         views: dto.views ?? 0,
         phase,
-        assigneeId: assigneeProfile?.id,
-        assigneeName: assigneeProfile?.name,
-        assigneeAvatar: assigneeProfile?.avatar,
-        assigneeRole: assigneeProfile?.role,
+        assignedUser,
+        assignedUserId: assignedUser?.id,
+        costing,
+        costingId: costing?.id,
+        batchSize: dto.batchSize,
+        rawMaterials: dto.rawMaterials,
+        // Legacy assignee fields (populated from User if assignedUserId provided, otherwise from assignee profile)
+        assigneeId: assignedUser?.id || assigneeProfile?.id,
+        assigneeName: assignedUser?.userName || assigneeProfile?.name,
+        assigneeRole: assignedUser?.role?.code || assigneeProfile?.role,
         updatedBy: dto.updatedBy,
       });
 
@@ -348,7 +409,13 @@ export class TasksService {
       const saved = await this.taskRepository.save(task);
       this.logger.log(`createTask - Task created successfully with ID: ${saved.id}, taskId: ${saved.taskId}`);
 
-      const response = this.mapTaskToResponseDto(saved);
+      // Reload task with relations for response
+      const taskWithRelations = await this.taskRepository.findOne({
+        where: { id: saved.id },
+        relations: ['phase', 'assignedUser', 'costing'],
+      });
+
+      const response = this.mapTaskToResponseDto(taskWithRelations!);
       this.logger.debug(`createTask - Task response mapped: ${JSON.stringify(response, null, 2)}`);
       
       return response;
@@ -415,23 +482,81 @@ export class TasksService {
     if (dto.dueDate !== undefined) {
       task.dueDate = this.parseDate(dto.dueDate);
     }
-    if (dto.assignee !== undefined) {
-      if (dto.assignee === null || dto.assignee === '') {
+    // Handle assigned user update
+    if (dto.assignedUserId !== undefined) {
+      if (dto.assignedUserId === null || dto.assignedUserId === '') {
+        task.assignedUser = undefined;
+        task.assignedUserId = undefined;
         task.assigneeId = undefined;
         task.assigneeName = undefined;
-        task.assigneeAvatar = undefined;
         task.assigneeRole = undefined;
       } else {
+        const assignedUser = await this.userRepository.findOne({
+          where: { id: dto.assignedUserId },
+        });
+        if (!assignedUser) {
+          throw new NotFoundException(`User with ID ${dto.assignedUserId} not found`);
+        }
+        if (!assignedUser.isActive) {
+          throw new BadRequestException(`User ${dto.assignedUserId} is not active`);
+        }
+        task.assignedUser = assignedUser;
+        task.assignedUserId = assignedUser.id;
+        task.assigneeId = assignedUser.id;
+        task.assigneeName = assignedUser.userName;
+        task.assigneeRole = assignedUser.role?.code;
+      }
+    }
+
+    // Handle costing update
+    if (dto.costingId !== undefined) {
+      if (dto.costingId === null || dto.costingId === '') {
+        task.costing = undefined;
+        task.costingId = undefined;
+      } else {
+        const costing = await this.costingRepository.findOne({
+          where: { id: dto.costingId },
+        });
+        if (!costing) {
+          throw new NotFoundException(`Costing with ID ${dto.costingId} not found`);
+        }
+        if (!costing.isActive) {
+          throw new BadRequestException(`Costing ${dto.costingId} is not active`);
+        }
+        task.costing = costing;
+        task.costingId = costing.id;
+      }
+    }
+
+    // Handle legacy assignee (for backward compatibility)
+    if (dto.assignee !== undefined) {
+      if (dto.assignee === null || dto.assignee === '') {
+        // Only clear if assignedUserId is not set
+        if (!dto.assignedUserId) {
+          task.assigneeId = undefined;
+          task.assigneeName = undefined;
+          task.assigneeRole = undefined;
+        }
+      } else {
         const assigneeProfile = resolveAssigneeProfile(dto.assignee);
-        task.assigneeId = assigneeProfile?.id;
-        task.assigneeName = assigneeProfile?.name;
-        task.assigneeAvatar = assigneeProfile?.avatar;
-        task.assigneeRole = assigneeProfile?.role;
+        // Only update legacy fields if assignedUserId is not set
+        if (!dto.assignedUserId) {
+          task.assigneeId = assigneeProfile?.id;
+          task.assigneeName = assigneeProfile?.name;
+          task.assigneeRole = assigneeProfile?.role;
+        }
       }
     }
 
     const saved = await this.taskRepository.save(task);
-    return this.mapTaskToResponseDto(saved);
+    
+    // Reload task with relations for response
+    const taskWithRelations = await this.taskRepository.findOne({
+      where: { id: saved.id },
+      relations: ['phase', 'assignedUser', 'costing'],
+    });
+    
+    return this.mapTaskToResponseDto(taskWithRelations!);
   }
 
   async deleteTask(identifier: string): Promise<void> {
@@ -499,6 +624,138 @@ export class TasksService {
     return TASK_STATUS_REFERENCE;
   }
 
+  // ========== COMMENT OPERATIONS ==========
+
+  /**
+   * Add a comment to a task
+   */
+  async addComment(
+    taskId: string,
+    createCommentDto: CreateTaskCommentDto,
+  ): Promise<TaskCommentResponseDto> {
+    this.logger.log(`addComment - Adding comment to task: ${taskId}`);
+
+    // Find task - use task.id for the comment relation
+    const task = await this.findTaskByTaskIdOrThrow(taskId);
+
+    // Validate and load owner if ownerId is provided
+    let owner: User | undefined;
+    if (createCommentDto.ownerId) {
+      const foundUser = await this.userRepository.findOne({
+        where: { id: createCommentDto.ownerId },
+      });
+      if (!foundUser) {
+        throw new NotFoundException(
+          `User with ID ${createCommentDto.ownerId} not found`,
+        );
+      }
+      owner = foundUser;
+    }
+
+    // Create comment - use task.id (UUID) for taskId
+    const comment = this.commentRepository.create({
+      taskId: task.id,
+      task,
+      comment: createCommentDto.comment,
+      owner,
+      ownerId: owner?.id,
+      ownerName: owner?.userName || createCommentDto.ownerName,
+      ownerEmail: owner?.email || createCommentDto.ownerEmail,
+    });
+
+    const savedComment = await this.commentRepository.save(comment);
+
+    // Update task comment count
+    const commentCount = await this.commentRepository.count({
+      where: { taskId: task.id },
+    });
+    await this.taskRepository.update(task.id, { comments: commentCount });
+
+    this.logger.log(
+      `addComment - Comment added successfully: ${savedComment.id}`,
+    );
+
+    // Reload comment with owner relation
+    const commentWithOwner = await this.commentRepository.findOne({
+      where: { id: savedComment.id },
+      relations: ['owner'],
+    });
+
+    return this.mapCommentToResponseDto(commentWithOwner!);
+  }
+
+  /**
+   * Get all comments for a task
+   */
+  async getTaskComments(taskId: string): Promise<TaskCommentResponseDto[]> {
+    this.logger.log(`getTaskComments - Getting comments for task: ${taskId}`);
+
+    // Verify task exists and get its UUID
+    const task = await this.findTaskByTaskIdOrThrow(taskId);
+
+    const comments = await this.commentRepository.find({
+      where: { taskId: task.id },
+      relations: ['owner'],
+      order: { commentedDate: 'DESC' },
+    });
+
+    return comments.map((comment) => this.mapCommentToResponseDto(comment));
+  }
+
+  /**
+   * Delete a comment
+   */
+  async deleteComment(commentId: string): Promise<void> {
+    this.logger.log(`deleteComment - Deleting comment: ${commentId}`);
+
+    const comment = await this.commentRepository.findOne({
+      where: { id: commentId },
+      relations: ['task'],
+    });
+
+    if (!comment) {
+      throw new NotFoundException(`Comment with ID ${commentId} not found`);
+    }
+
+    const taskId = comment.taskId;
+
+    await this.commentRepository.remove(comment);
+
+    // Update task comment count
+    const commentCount = await this.commentRepository.count({
+      where: { taskId },
+    });
+    await this.taskRepository.update(taskId, { comments: commentCount });
+
+    this.logger.log(`deleteComment - Comment deleted successfully: ${commentId}`);
+  }
+
+  /**
+   * Map comment entity to response DTO
+   */
+  private mapCommentToResponseDto(
+    comment: TaskCommentEntity,
+  ): TaskCommentResponseDto {
+    return {
+      id: comment.id,
+      taskId: comment.taskId,
+      comment: comment.comment,
+      ownerId: comment.ownerId,
+      owner: comment.owner
+        ? {
+            id: comment.owner.id,
+            userName: comment.owner.userName,
+            email: comment.owner.email,
+          }
+        : undefined,
+      ownerName: comment.ownerName,
+      ownerEmail: comment.ownerEmail,
+      commentedDate: comment.commentedDate,
+      createdAt: comment.createdAt,
+      updatedAt: comment.updatedAt,
+    };
+  }
+
   private async getPhaseTaskCountMap(): Promise<Map<string, number>> {
     const countsRaw = await this.taskRepository
       .createQueryBuilder('task')
@@ -558,11 +815,11 @@ export class TasksService {
     task: TaskEntity,
     phaseOverrideId?: string,
   ): TaskResponseDto {
+    // Handle legacy assignee profile
     const fallbackProfile = resolveAssigneeProfile(task.assigneeId);
     const hasStoredProfileData = !!(
       task.assigneeId ||
       task.assigneeName ||
-      task.assigneeAvatar ||
       task.assigneeRole
     );
 
@@ -570,7 +827,6 @@ export class TasksService {
       ? {
           id: task.assigneeId ?? fallbackProfile?.id ?? '',
           name: task.assigneeName ?? fallbackProfile?.name ?? '',
-          avatar: task.assigneeAvatar ?? fallbackProfile?.avatar,
           role: task.assigneeRole ?? fallbackProfile?.role,
         }
       : fallbackProfile;
@@ -588,7 +844,35 @@ export class TasksService {
       priority: task.priority,
       dueDate: task.dueDate,
       assignee: profile,
+      assignedUserId: task.assignedUserId,
+      assignedUser: task.assignedUser
+        ? {
+            id: task.assignedUser.id,
+            userName: task.assignedUser.userName,
+            email: task.assignedUser.email,
+          }
+        : undefined,
+      costingId: task.costingId,
+      costing: task.costing
+        ? {
+            id: task.costing.id,
+            itemName: task.costing.itemName,
+            itemCode: task.costing.itemCode,
+            version: task.costing.version,
+            isActive: task.costing.isActive,
+          }
+        : undefined,
+      batchSize: task.batchSize,
+      rawMaterials: task.rawMaterials,
       comments: task.comments,
+      commentList: task.commentList
+        ? task.commentList
+            .sort(
+              (a, b) =>
+                b.commentedDate.getTime() - a.commentedDate.getTime(),
+            )
+            .map((comment) => this.mapCommentToResponseDto(comment))
+        : undefined,
       views: task.views,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
@@ -643,7 +927,7 @@ export class TasksService {
       this.logger.debug(`findTaskByTaskIdOrThrow - Searching by UUID id: ${identifier}`);
       task = await this.taskRepository.findOne({
         where: { id: identifier },
-        relations: ['phase'],
+        relations: ['phase', 'assignedUser', 'costing', 'commentList', 'commentList.owner'],
       });
     }
 
@@ -654,7 +938,7 @@ export class TasksService {
       );
       task = await this.taskRepository.findOne({
         where: { taskId: identifier },
-        relations: ['phase'],
+        relations: ['phase', 'assignedUser', 'costing', 'commentList', 'commentList.owner'],
       });
     }
 

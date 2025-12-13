@@ -63,6 +63,7 @@ export class ItemManagementController {
 
   /**
    * Get all items with pagination and filters
+   * 🔄 UPDATED - Added category ID filtering
    */
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
@@ -70,7 +71,7 @@ export class ItemManagementController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number = 50,
     @Query('search') search?: string,
-    @Query('category') category?: string,
+    @Query('category') category?: string, // Category ID (UUID) - NEW
     @Query('includeSuppliers', new DefaultValuePipe(false), ParseBoolPipe)
     includeSuppliers?: boolean,
   ): Promise<{
@@ -82,44 +83,24 @@ export class ItemManagementController {
   }> {
     // eslint-disable-next-line no-useless-catch
     try {
-      // If search or category is provided, use search functionality
-      if (search || category) {
-        let items: itemInterface.ItemResponseDto[] = [];
+      // Use unified filter method that handles both search and category
+      const items = await this.itemService.findWithFilters(
+        search,
+        category, // category is now treated as categoryId (UUID)
+        includeSuppliers,
+      );
 
-        if (search) {
-          items = await this.itemService.search(search);
-        } else if (category) {
-          items = await this.itemService.findByCategory(category);
-        }
-
-        // Manual pagination for search results
-        const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit;
-        const paginatedItems = items.slice(startIndex, endIndex);
-
-        return {
-          data: paginatedItems,
-          total: items.length,
-          page,
-          limit,
-          totalPages: Math.ceil(items.length / limit),
-        };
-      }
-
-      // Otherwise get all items with pagination
-      const allItems = await this.itemService.findAll(includeSuppliers);
-
-      // Manual pagination
+      // Apply pagination
       const startIndex = (page - 1) * limit;
       const endIndex = startIndex + limit;
-      const paginatedItems = allItems.slice(startIndex, endIndex);
+      const paginatedItems = items.slice(startIndex, endIndex);
 
       return {
         data: paginatedItems,
-        total: allItems.length,
+        total: items.length,
         page,
         limit,
-        totalPages: Math.ceil(allItems.length / limit),
+        totalPages: Math.ceil(items.length / limit),
       };
     } catch (error) {
       throw error;

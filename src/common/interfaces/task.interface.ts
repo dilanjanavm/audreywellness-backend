@@ -3,8 +3,43 @@ import { TaskPriority, TaskStatus } from '../enums/task.enum';
 export interface TaskAssigneeProfile {
   id: string;
   name: string;
-  avatar?: string;
   role?: string;
+}
+
+export interface TaskRawMaterialDto {
+  rawMaterialId: string;
+  rawMaterialName: string;
+  percentage: string;
+  unitPrice: string;
+  units: string;
+  supplier: string;
+  category: string;
+  kg: number;
+  cost: number;
+}
+
+export interface CreateTaskCommentDto {
+  comment: string;
+  ownerId?: string; // Optional - User UUID, if not provided, ownerName/ownerEmail can be used
+  ownerName?: string; // Optional - For anonymous or external comments
+  ownerEmail?: string; // Optional - For anonymous or external comments
+}
+
+export interface TaskCommentResponseDto {
+  id: string;
+  taskId: string;
+  comment: string;
+  ownerId?: string;
+  owner?: {
+    id: string;
+    userName: string;
+    email: string;
+  };
+  ownerName?: string;
+  ownerEmail?: string;
+  commentedDate: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface PhaseBaseDto {
@@ -41,7 +76,11 @@ export interface TaskBaseDto {
   status: TaskStatus;
   priority?: TaskPriority;
   dueDate?: string;
-  assignee?: string | null;
+  assignee?: string | null; // Legacy - kept for backward compatibility
+  assignedUserId?: string; // NEW - User UUID
+  costingId?: string; // NEW - Costing UUID
+  batchSize?: string; // NEW - Batch size (e.g., "batch0_5kg")
+  rawMaterials?: TaskRawMaterialDto[]; // NEW - Raw materials array
   comments?: number;
   views?: number;
   order?: number;
@@ -62,8 +101,25 @@ export interface TaskResponseDto {
   description?: string;
   priority?: TaskPriority;
   dueDate?: Date;
-  assignee?: TaskAssigneeProfile | null;
-  comments: number;
+  assignee?: TaskAssigneeProfile | null; // Legacy - kept for backward compatibility
+  assignedUserId?: string; // NEW
+  assignedUser?: { // NEW
+    id: string;
+    userName: string;
+    email: string;
+  };
+  costingId?: string; // NEW
+  costing?: { // NEW
+    id: string;
+    itemName: string;
+    itemCode: string;
+    version: number;
+    isActive: boolean;
+  };
+  batchSize?: string; // NEW
+  rawMaterials?: TaskRawMaterialDto[]; // NEW
+  comments: number; // Legacy count field
+  commentList?: TaskCommentResponseDto[]; // NEW - Array of comments
   views: number;
   createdAt: Date;
   updatedAt: Date;

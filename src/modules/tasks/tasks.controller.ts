@@ -149,6 +149,105 @@ export class TasksController {
     }
   }
 
+  @Get('reference/statuses')
+  listStatuses() {
+    this.logger.log(`GET /tasks/reference/statuses - Getting status reference`);
+    try {
+      const data = this.tasksService.getStatusReference();
+      this.logger.log(`GET /tasks/reference/statuses - Success: ${data.length} statuses found`);
+      return { data };
+    } catch (error) {
+      this.logger.error(`GET /tasks/reference/statuses - Error: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  // ========== COMMENT ENDPOINTS ==========
+  // IMPORTANT: These routes must come BEFORE generic :taskId routes to avoid route conflicts
+
+  /**
+   * Add a comment to a task
+   * ⭐ NEW
+   */
+  
+  @Post(':taskId/comments')
+  async addComment(
+    @Param('taskId') taskId: string,
+    @Body() createCommentDto: taskInterface.CreateTaskCommentDto,
+  ) {
+    this.logger.log(`POST /tasks/${taskId}/comments - Request received`);
+    this.logger.debug(
+      `POST /tasks/${taskId}/comments - Request body: ${JSON.stringify(createCommentDto, null, 2)}`,
+    );
+
+    try {
+      if (!createCommentDto.comment || createCommentDto.comment.trim().length === 0) {
+        throw new BadRequestException('Comment is required');
+      }
+
+      const data = await this.tasksService.addComment(taskId, createCommentDto);
+      this.logger.log(
+        `POST /tasks/${taskId}/comments - Success: Comment added with ID ${data.id}`,
+      );
+      return { data };
+    } catch (error) {
+      this.logger.error(
+        `POST /tasks/${taskId}/comments - Error: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get all comments for a task
+   * ⭐ NEW
+   */
+  @Get(':taskId/comments')
+  async getTaskComments(@Param('taskId') taskId: string) {
+    this.logger.log(`GET /tasks/${taskId}/comments - Request received`);
+
+    try {
+      const data = await this.tasksService.getTaskComments(taskId);
+      this.logger.log(
+        `GET /tasks/${taskId}/comments - Success: ${data.length} comments found`,
+      );
+      return { data };
+    } catch (error) {
+      this.logger.error(
+        `GET /tasks/${taskId}/comments - Error: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a comment
+   * ⭐ NEW
+   */
+  @Delete('comments/:commentId')
+  async deleteComment(@Param('commentId') commentId: string) {
+    this.logger.log(`DELETE /tasks/comments/${commentId} - Request received`);
+
+    try {
+      await this.tasksService.deleteComment(commentId);
+      this.logger.log(
+        `DELETE /tasks/comments/${commentId} - Success: Comment deleted`,
+      );
+      return { data: { message: 'Comment deleted successfully' } };
+    } catch (error) {
+      this.logger.error(
+        `DELETE /tasks/comments/${commentId} - Error: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  // ========== TASK CRUD ENDPOINTS ==========
+  // These generic :taskId routes come AFTER more specific routes
+
   @Put(':taskId')
   async updateTask(
     @Param('taskId') taskId: string,
@@ -161,19 +260,6 @@ export class TasksController {
       return { data };
     } catch (error) {
       this.logger.error(`PUT /tasks/${taskId} - Error: ${error.message}`, error.stack);
-      throw error;
-    }
-  }
-
-  @Delete(':taskId')
-  async deleteTask(@Param('taskId') taskId: string) {
-    this.logger.log(`DELETE /tasks/${taskId} - Deleting task`);
-    try {
-      await this.tasksService.deleteTask(taskId);
-      this.logger.log(`DELETE /tasks/${taskId} - Success: Task deleted`);
-      return { data: null };
-    } catch (error) {
-      this.logger.error(`DELETE /tasks/${taskId} - Error: ${error.message}`, error.stack);
       throw error;
     }
   }
@@ -194,15 +280,15 @@ export class TasksController {
     }
   }
 
-  @Get('reference/statuses')
-  listStatuses() {
-    this.logger.log(`GET /tasks/reference/statuses - Getting status reference`);
+  @Delete(':taskId')
+  async deleteTask(@Param('taskId') taskId: string) {
+    this.logger.log(`DELETE /tasks/${taskId} - Deleting task`);
     try {
-      const data = this.tasksService.getStatusReference();
-      this.logger.log(`GET /tasks/reference/statuses - Success: ${data.length} statuses found`);
-      return { data };
+      await this.tasksService.deleteTask(taskId);
+      this.logger.log(`DELETE /tasks/${taskId} - Success: Task deleted`);
+      return { data: null };
     } catch (error) {
-      this.logger.error(`GET /tasks/reference/statuses - Error: ${error.message}`, error.stack);
+      this.logger.error(`DELETE /tasks/${taskId} - Error: ${error.message}`, error.stack);
       throw error;
     }
   }
