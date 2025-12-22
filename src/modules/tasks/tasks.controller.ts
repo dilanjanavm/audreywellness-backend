@@ -11,6 +11,7 @@ import {
   Put,
   Query,
   UseFilters,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
@@ -18,10 +19,13 @@ import * as taskInterface from '../../common/interfaces/task.interface';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { TaskStatus } from '../../common/enums/task.enum';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('tasks')
 @UseFilters(HttpExceptionFilter)
 @UseInterceptors(TransformInterceptor)
+@UseGuards(JwtAuthGuard)
 export class TasksController {
   private readonly logger = new Logger(TasksController.name);
 
@@ -30,11 +34,16 @@ export class TasksController {
   }
 
   @Get('phases')
-  async listPhases(@Query('includeTasks') includeTasks?: string) {
+  async listPhases(
+    @Query('includeTasks') includeTasks?: string,
+    @CurrentUser() currentUser?: any,
+  ) {
     this.logger.log(`GET /tasks/phases - includeTasks: ${includeTasks}`);
+    this.logger.log(`GET /tasks/phases - Current User: ${currentUser?.userId || 'N/A'}, Role: ${currentUser?.role || 'N/A'}`);
     try {
       const data = await this.tasksService.listPhases(
         this.parseBoolean(includeTasks),
+        currentUser,
       );
       this.logger.log(`GET /tasks/phases - Success: ${data.length} phases found`);
       return { data };
@@ -130,8 +139,10 @@ export class TasksController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('search') search?: string,
+    @CurrentUser() currentUser?: any,
   ) {
     this.logger.log(`GET /tasks/phases/${phaseId}/tasks - Filters: ${JSON.stringify({ status, dateFrom, dateTo, search })}`);
+    this.logger.log(`GET /tasks/phases/${phaseId}/tasks - Current User: ${currentUser?.userId || 'N/A'}, Role: ${currentUser?.role || 'N/A'}`);
     try {
       const filters: taskInterface.PhaseTaskFilters = {
         status: this.parseStatusArray(status),
@@ -140,7 +151,7 @@ export class TasksController {
         search: search?.trim() || undefined,
       };
 
-      const data = await this.tasksService.getPhaseTasks(phaseId, filters);
+      const data = await this.tasksService.getPhaseTasks(phaseId, filters, currentUser);
       this.logger.log(`GET /tasks/phases/${phaseId}/tasks - Success: ${data.data.length} tasks found`);
       return { data };
     } catch (error) {
@@ -169,7 +180,6 @@ export class TasksController {
    * Add a comment to a task
    * ⭐ NEW
    */
-  
   @Post(':taskId/comments')
   async addComment(
     @Param('taskId') taskId: string,
@@ -239,6 +249,64 @@ export class TasksController {
     } catch (error) {
       this.logger.error(
         `DELETE /tasks/comments/${commentId} - Error: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  // ========== TASK MOVEMENT ENDPOINTS ==========
+
+  /**
+   * Move a task from one phase to another
+   * ⭐ NEW
+   */
+  @Post(':taskId/move')
+  async moveTaskToPhase(
+    @Param('taskId') taskId: string,
+    @Body() moveTaskDto: taskInterface.MoveTaskDto,
+  ) {
+    this.logger.log(`POST /tasks/${taskId}/move - Request received`);
+    this.logger.debug(
+      `POST /tasks/${taskId}/move - Request body: ${JSON.stringify(moveTaskDto, null, 2)}`,
+    );
+
+    try {
+      if (!moveTaskDto.toPhaseId) {
+        throw new BadRequestException('toPhaseId is required');
+      }
+
+      const data = await this.tasksService.moveTaskToPhase(taskId, moveTaskDto);
+      this.logger.log(
+        `POST /tasks/${taskId}/move - Success: Task moved to phase ${moveTaskDto.toPhaseId}`,
+      );
+      return { data };
+    } catch (error) {
+      this.logger.error(
+        `POST /tasks/${taskId}/move - Error: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get movement history for a task
+   * ⭐ NEW
+   */
+  @Get(':taskId/movement-history')
+  async getTaskMovementHistory(@Param('taskId') taskId: string) {
+    this.logger.log(`GET /tasks/${taskId}/movement-history - Request received`);
+
+    try {
+      const data = await this.tasksService.getTaskMovementHistory(taskId);
+      this.logger.log(
+        `GET /tasks/${taskId}/movement-history - Success: ${data.length} movements found`,
+      );
+      return { data };
+    } catch (error) {
+      this.logger.error(
+        `GET /tasks/${taskId}/movement-history - Error: ${error.message}`,
         error.stack,
       );
       throw error;

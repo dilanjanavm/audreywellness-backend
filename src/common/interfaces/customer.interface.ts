@@ -21,6 +21,7 @@ export interface CreateCustomerDto {
   status?: Status;
   salesGroup: string;
   customerType?: CustomerType;
+  sendEmail?: boolean; // optional, default: true - send welcome email
 }
 
 export interface UpdateCustomerDto {

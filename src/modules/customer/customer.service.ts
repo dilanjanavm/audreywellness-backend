@@ -5,6 +5,7 @@ import {
   ConflictException,
   BadRequestException,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike, FindOptionsWhere } from 'typeorm';
@@ -22,12 +23,16 @@ import { PaymentTerms } from 'src/common/enums/payment-terms';
 import { SalesType } from '../../common/enums/sales-type';
 import { parse } from 'csv-parse';
 import { Readable } from 'stream';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class CustomerService {
+  private readonly logger = new Logger(CustomerService.name);
+
   constructor(
     @InjectRepository(CustomerEntity)
     private readonly customerRepository: Repository<CustomerEntity>,
+    private readonly emailService: EmailService,
   ) {}
 
   async generateSNo(): Promise<string> {
@@ -87,6 +92,34 @@ export class CustomerService {
     });
 
     const savedCustomer = await this.customerRepository.save(customer);
+
+    // Send welcome email if requested (default: true) and email is provided
+    if (createCustomerDto.sendEmail !== false && savedCustomer.email) {
+      const emailSent = await this.emailService.sendCustomerWelcomeEmail(
+        savedCustomer.email,
+        savedCustomer.name,
+        savedCustomer.sNo,
+        savedCustomer.smsPhone,
+      );
+      if (!emailSent) {
+        this.logger.warn(
+          `Failed to send welcome email to ${savedCustomer.email}, but customer was created`,
+        );
+      } else {
+        this.logger.log(
+          `Customer welcome email sent successfully to ${savedCustomer.email}`,
+        );
+      }
+    } else if (createCustomerDto.sendEmail !== false && !savedCustomer.email) {
+      this.logger.warn(
+        `Customer created without email address. Welcome email not sent.`,
+      );
+    }
+
+    this.logger.log(
+      `Customer created successfully: ${savedCustomer.id} (${savedCustomer.name})`,
+    );
+
     return this.mapToResponseDto(savedCustomer);
   }
 

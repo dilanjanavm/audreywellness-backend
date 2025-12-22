@@ -19,6 +19,7 @@ import {
 import { TaskPhaseEntity } from './entities/task-phase.entity';
 import { TaskEntity } from './entities/task.entity';
 import { TaskCommentEntity } from './entities/task-comment.entity';
+import { TaskMovementHistoryEntity } from './entities/task-movement-history.entity';
 import { TaskStatus } from '../../common/enums/task.enum';
 import {
   TASK_STATUS_IDS,
@@ -30,6 +31,8 @@ import { CostingEntity } from '../costing/entities/costing.entity';
 import {
   CreateTaskCommentDto,
   TaskCommentResponseDto,
+  MoveTaskDto,
+  TaskMovementHistoryResponseDto,
 } from '../../common/interfaces/task.interface';
 
 @Injectable()
@@ -43,6 +46,8 @@ export class TasksService {
     private readonly taskRepository: Repository<TaskEntity>,
     @InjectRepository(TaskCommentEntity)
     private readonly commentRepository: Repository<TaskCommentEntity>,
+    @InjectRepository(TaskMovementHistoryEntity)
+    private readonly movementHistoryRepository: Repository<TaskMovementHistoryEntity>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @InjectRepository(CostingEntity)
@@ -51,7 +56,9 @@ export class TasksService {
     this.logger.log('TasksService initialized');
   }
 
-  async listPhases(includeTasks = false): Promise<PhaseResponseDto[]> {
+  async listPhases(includeTasks = false, currentUser?: any): Promise<PhaseResponseDto[]> {
+    this.logger.log(`listPhases - includeTasks: ${includeTasks}, User: ${currentUser?.userId || 'N/A'}`);
+    
     const phases = await this.phaseRepository.find({
       order: { order: 'ASC', createdAt: 'ASC' },
       relations: includeTasks
@@ -62,6 +69,29 @@ export class TasksService {
           ]
         : [],
     });
+
+    // Apply role-based filtering to tasks if includeTasks is true
+    if (includeTasks) {
+      const canViewAllTasks = this.canUserViewAllTasks(currentUser);
+      const userId = currentUser?.userId || currentUser?.sub;
+
+      this.logger.log(`listPhases - Can view all tasks: ${canViewAllTasks}, User ID: ${userId || 'N/A'}`);
+
+      phases.forEach((phase) => {
+        if (phase.tasks && phase.tasks.length > 0) {
+          if (!canViewAllTasks && userId) {
+            // Filter tasks to only show those assigned to the current user
+            phase.tasks = phase.tasks.filter(
+              (task) => task.assignedUserId === userId,
+            );
+            this.logger.log(`listPhases - Filtered tasks for phase ${phase.id}: ${phase.tasks.length} tasks`);
+          } else if (canViewAllTasks) {
+            // Show all tasks for Super Admin, Admin, or Manager
+            this.logger.log(`listPhases - Showing all tasks for phase ${phase.id}: ${phase.tasks.length} tasks`);
+          }
+        }
+      });
+    }
 
     const taskCounts = await this.getPhaseTaskCountMap();
 
@@ -180,11 +210,14 @@ export class TasksService {
   async getPhaseTasks(
     phaseId: string,
     filters: PhaseTaskFilters,
+    currentUser?: any,
   ): Promise<{
     phaseId: string;
     filters: PhaseTaskFilters;
     data: TaskResponseDto[];
   }> {
+    this.logger.log(`getPhaseTasks - Starting for phase: ${phaseId}`);
+    
     const phase = await this.phaseRepository.findOne({
       where: { id: phaseId },
     });
@@ -204,9 +237,28 @@ export class TasksService {
       });
     }
 
+    // Check if user can view all tasks (Super Admin, Admin, or Manager)
+    const canViewAllTasks = this.canUserViewAllTasks(currentUser);
+    const userId = currentUser?.userId || currentUser?.sub;
+
+    this.logger.log(`getPhaseTasks - User ID: ${userId || 'N/A'}, Role: ${currentUser?.role || 'N/A'}, Can view all tasks: ${canViewAllTasks}`);
+
     const qb = this.taskRepository
       .createQueryBuilder('task')
       .where('task.phase_id = :phaseId', { phaseId });
+
+    // Apply role-based filtering
+    if (!canViewAllTasks && userId) {
+      // Staff or other users: only show tasks assigned to them
+      this.logger.log(`getPhaseTasks - Filtering tasks for user: ${userId}`);
+      qb.andWhere('task.assigned_user_id = :userId', { userId });
+    } else if (canViewAllTasks) {
+      // Super Admin, Admin, or Manager: show all tasks (no additional filter)
+      this.logger.log(`getPhaseTasks - User has elevated role, showing all tasks`);
+    } else {
+      // No user info or no userId: show all tasks (fallback for backward compatibility)
+      this.logger.warn(`getPhaseTasks - No user info provided, showing all tasks (fallback)`);
+    }
 
     if (filters.status && filters.status.length > 0) {
       qb.andWhere('task.status IN (:...status)', {
@@ -240,11 +292,38 @@ export class TasksService {
       .addOrderBy('task.order_index', 'ASC')
       .getMany();
 
+    this.logger.log(`getPhaseTasks - Found ${tasks.length} tasks for phase ${phaseId}`);
+
     return {
       phaseId,
       filters,
       data: tasks.map((task) => this.mapTaskToResponseDto(task)),
     };
+  }
+
+  /**
+   * Check if user can view all tasks (Super Admin, Admin, or Manager)
+   * @param currentUser - Current user object from JWT token
+   * @returns true if user can view all tasks, false otherwise
+   */
+  private canUserViewAllTasks(currentUser?: any): boolean {
+    if (!currentUser) {
+      return false;
+    }
+
+    // Get role from user object (can be from 'role' or 'roles' array)
+    const userRole = currentUser.role || (currentUser.roles && currentUser.roles[0]) || '';
+    const normalizedRole = typeof userRole === 'string' ? userRole.toLowerCase() : '';
+
+    this.logger.log(`canUserViewAllTasks - Checking role: ${normalizedRole}`);
+
+    // Check if role is Super Admin, Admin, or Manager
+    const elevatedRoles = ['super_admin', 'admin', 'manager'];
+    const canViewAll = elevatedRoles.includes(normalizedRole);
+
+    this.logger.log(`canUserViewAllTasks - Role ${normalizedRole} can view all tasks: ${canViewAll}`);
+
+    return canViewAll;
   }
 
   async createTask(dto: CreateTaskDto): Promise<TaskResponseDto> {
@@ -753,6 +832,162 @@ export class TasksService {
       commentedDate: comment.commentedDate,
       createdAt: comment.createdAt,
       updatedAt: comment.updatedAt,
+    };
+  }
+
+  // ========== TASK MOVEMENT OPERATIONS ==========
+
+  /**
+   * Move a task from one phase to another
+   * This creates a history record and updates the task
+   */
+  async moveTaskToPhase(
+    taskId: string,
+    moveTaskDto: MoveTaskDto,
+  ): Promise<TaskResponseDto> {
+    this.logger.log(`moveTaskToPhase - Moving task ${taskId} to phase ${moveTaskDto.toPhaseId}`);
+
+    // Find the task with current phase
+    const task = await this.findTaskByTaskIdOrThrow(taskId);
+    const fromPhaseId = task.phaseId;
+    const fromStatus = task.status;
+
+    // Validate target phase exists
+    const toPhase = await this.findPhaseOrThrow(moveTaskDto.toPhaseId);
+
+    if (fromPhaseId === moveTaskDto.toPhaseId) {
+      throw new BadRequestException(
+        `Task is already in phase ${toPhase.name}. Cannot move to the same phase.`,
+      );
+    }
+
+    // Determine target status - use provided status or default to first status of target phase
+    const toStatus = moveTaskDto.toStatus || toPhase.statuses[0];
+    this.ensureStatusesValid([toStatus]);
+    this.ensureStatusInPhase(toStatus, toPhase);
+
+    // Determine target order - use provided order or calculate next available
+    const targetOrder =
+      moveTaskDto.order ?? (await this.getNextTaskOrder(moveTaskDto.toPhaseId, toStatus));
+
+    // Get user who initiated the movement (if provided)
+    let movedByUser: User | undefined;
+    let movedByName: string | undefined;
+
+    if (moveTaskDto.movedBy) {
+      // Check if it's a UUID (user ID)
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        moveTaskDto.movedBy,
+      );
+
+      if (isUUID) {
+        const foundUser = await this.userRepository.findOne({
+          where: { id: moveTaskDto.movedBy },
+        });
+        movedByUser = foundUser ?? undefined;
+        movedByName = movedByUser?.userName;
+      } else {
+        movedByName = moveTaskDto.movedBy;
+      }
+    }
+
+    // Shift task orders in target phase/status
+    await this.shiftTaskOrders(moveTaskDto.toPhaseId, toStatus, targetOrder, task.id);
+
+    // Create movement history record
+    const movementHistory = this.movementHistoryRepository.create({
+      taskId: task.id,
+      task,
+      fromPhaseId,
+      fromPhase: task.phase,
+      toPhaseId: moveTaskDto.toPhaseId,
+      toPhase,
+      fromStatus,
+      toStatus,
+      movedByUser,
+      movedByUserId: movedByUser?.id,
+      movedByName,
+      reason: moveTaskDto.reason,
+    });
+
+    await this.movementHistoryRepository.save(movementHistory);
+    this.logger.log(
+      `moveTaskToPhase - Movement history created: ${movementHistory.id}`,
+    );
+
+    // Update task: change phase, status, and order
+    task.phase = toPhase;
+    task.phaseId = moveTaskDto.toPhaseId;
+    task.status = toStatus;
+    task.order = targetOrder;
+
+    const savedTask = await this.taskRepository.save(task);
+
+    this.logger.log(
+      `moveTaskToPhase - Task ${taskId} moved from phase ${fromPhaseId} to phase ${moveTaskDto.toPhaseId}`,
+    );
+
+    // Reload task with all relations for response
+    const taskWithRelations = await this.taskRepository.findOne({
+      where: { id: savedTask.id },
+      relations: ['phase', 'assignedUser', 'costing', 'commentList', 'commentList.owner'],
+    });
+
+    return this.mapTaskToResponseDto(taskWithRelations!);
+  }
+
+  /**
+   * Get movement history for a task
+   */
+  async getTaskMovementHistory(
+    taskId: string,
+  ): Promise<TaskMovementHistoryResponseDto[]> {
+    this.logger.log(`getTaskMovementHistory - Getting movement history for task ${taskId}`);
+
+    // Verify task exists
+    const task = await this.taskRepository.findOne({
+      where: [{ id: taskId }, { taskId }],
+    });
+
+    if (!task) {
+      throw new NotFoundException(`Task ${taskId} not found`);
+    }
+
+    const movements = await this.movementHistoryRepository.find({
+      where: { taskId: task.id },
+      relations: ['fromPhase', 'toPhase', 'movedByUser'],
+      order: { movedAt: 'DESC' },
+    });
+
+    return movements.map((movement) => this.mapMovementHistoryToResponseDto(movement));
+  }
+
+  /**
+   * Map movement history entity to response DTO
+   */
+  private mapMovementHistoryToResponseDto(
+    movement: TaskMovementHistoryEntity,
+  ): TaskMovementHistoryResponseDto {
+    return {
+      id: movement.id,
+      taskId: movement.taskId,
+      fromPhaseId: movement.fromPhaseId,
+      fromPhaseName: movement.fromPhase?.name,
+      toPhaseId: movement.toPhaseId,
+      toPhaseName: movement.toPhase?.name,
+      fromStatus: movement.fromStatus,
+      toStatus: movement.toStatus,
+      movedByUserId: movement.movedByUserId,
+      movedByName: movement.movedByName,
+      movedByUser: movement.movedByUser
+        ? {
+            id: movement.movedByUser.id,
+            userName: movement.movedByUser.userName,
+            email: movement.movedByUser.email,
+          }
+        : undefined,
+      reason: movement.reason,
+      movedAt: movement.movedAt,
     };
   }
 

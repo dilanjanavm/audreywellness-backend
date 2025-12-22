@@ -26,6 +26,7 @@ import { ItemsByCategoriesDto } from './dto/ItemsByCategoriesDto';
 import {
   PaginatedCostedProductsResponse,
   ProductCostHistoryDto,
+  CostedProductDto,
 } from './dto/cost-history.dto';
 
 @Controller('costing')
@@ -443,6 +444,7 @@ export class CostingController {
 
   /**
    * Get all products that have costing records (costed products)
+   * If itemId is provided, returns a single product with all costing versions
    */
   @Get('products/costed')
   async getCostedProducts(
@@ -450,15 +452,36 @@ export class CostingController {
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number = 10,
     @Query('search') search?: string,
     @Query('category') category?: string,
-  ): Promise<{ data: PaginatedCostedProductsResponse }> {
+    @Query('itemId') itemId?: string,
+  ): Promise<
+    | { data: PaginatedCostedProductsResponse }
+    | { data: CostedProductDto }
+  > {
     try {
+      // Validate itemId format if provided
+      if (itemId) {
+        const uuidRegex =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(itemId)) {
+          throw new BadRequestException('Invalid itemId format. Must be a valid UUID.');
+        }
+      }
+
       const result = await this.costingService.getCostedProducts(
         page,
         limit,
         search,
         category,
+        itemId,
       );
-      return { data: result };
+
+      // Type guard: if result has 'data' property, it's PaginatedCostedProductsResponse
+      // Otherwise, it's CostedProductDto
+      if ('data' in result && Array.isArray(result.data)) {
+        return { data: result as PaginatedCostedProductsResponse };
+      } else {
+        return { data: result as CostedProductDto };
+      }
     } catch (error) {
       throw error;
     }

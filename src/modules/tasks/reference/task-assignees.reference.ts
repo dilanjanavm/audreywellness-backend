@@ -43,3 +43,4 @@ export const resolveAssigneeProfile = (
     role: DEFAULT_ROLE,
   };
 };
+

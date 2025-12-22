@@ -18,6 +18,7 @@ import { EmailModule } from './modules/email/email.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { RolePermissionsModule } from './modules/role-permissions/role-permissions.module';
+import { RecipesModule } from './modules/recipes/recipes.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { RolePermissionsModule } from './modules/role-permissions/role-permissio
     RolesModule,
     PermissionsModule,
     RolePermissionsModule,
+    RecipesModule,
   ],
   controllers: [],
   providers: [],

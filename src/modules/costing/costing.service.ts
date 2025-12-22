@@ -1112,14 +1112,73 @@ export class CostingService {
 
   /**
    * Get all products that have costing records (costed products)
+   * If itemId is provided, returns a single product with all costing versions
    */
   async getCostedProducts(
     page: number = 1,
     limit: number = 10,
     search?: string,
     category?: string,
-  ): Promise<PaginatedCostedProductsResponse> {
+    itemId?: string,
+  ): Promise<PaginatedCostedProductsResponse | CostedProductDto> {
     try {
+      // If itemId is provided, return single product with all versions
+      if (itemId) {
+        // Validate item exists
+        const item = await this.itemRepository.findOne({
+          where: { id: itemId },
+        });
+
+        if (!item) {
+          throw new NotFoundException(`Item with ID ${itemId} not found`);
+        }
+
+        // Get all costings for this item, ordered by version descending
+        const allCostings = await this.costingRepository.find({
+          where: { itemId },
+          relations: ['rawMaterials', 'additionalCosts', 'totalCosts'],
+          order: { version: 'DESC' },
+        });
+
+        if (allCostings.length === 0) {
+          throw new NotFoundException(
+            `No costing records found for item ${itemId}`,
+          );
+        }
+
+        // Get active costing
+        const activeCosting = allCostings.find((c) => c.isActive);
+        const latestCosting = allCostings[0]; // First one is latest (DESC order)
+
+        // Map all costings to DTOs
+        const allCostingVersions = allCostings.map((costing) =>
+          this.mapToResponseDto(costing),
+        );
+
+        const product: CostedProductDto = {
+          itemId: item.id,
+          itemCode: item.itemCode,
+          itemName: item.description,
+          category: item.category,
+          categoryId: item.categoryId,
+          units: item.units,
+          price: item.price,
+          currency: item.currency,
+          status: item.status,
+          hasActiveCosting: !!activeCosting,
+          activeCostingVersion: activeCosting?.version,
+          totalCostingVersions: allCostings.length,
+          latestCosting: this.mapToResponseDto(latestCosting),
+          allCostingVersions: allCostingVersions,
+          lastCostUpdate: latestCosting?.updatedAt,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        };
+
+        return product;
+      }
+
+      // Original paginated logic for when itemId is not provided
       // First, get distinct item IDs that have costing records
       const costingsWithItems = await this.costingRepository
         .createQueryBuilder('costing')

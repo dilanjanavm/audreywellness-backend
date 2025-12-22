@@ -139,3 +139,31 @@ export interface TaskPositionDto {
   order: number;
   updatedBy?: string;
 }
+
+export interface MoveTaskDto {
+  toPhaseId: string;
+  toStatus?: TaskStatus; // Optional - defaults to first status of target phase
+  order?: number; // Optional - defaults to next available order
+  reason?: string; // Optional reason/notes for the movement
+  movedBy?: string; // Optional - user ID or name who initiated the movement
+}
+
+export interface TaskMovementHistoryResponseDto {
+  id: string;
+  taskId: string;
+  fromPhaseId: string;
+  fromPhaseName?: string;
+  toPhaseId: string;
+  toPhaseName?: string;
+  fromStatus?: string;
+  toStatus?: string;
+  movedByUserId?: string;
+  movedByName?: string;
+  movedByUser?: {
+    id: string;
+    userName: string;
+    email: string;
+  };
+  reason?: string;
+  movedAt: Date;
+}

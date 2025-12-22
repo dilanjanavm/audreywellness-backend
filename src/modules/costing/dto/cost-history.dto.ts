@@ -44,6 +44,7 @@ export class CostedProductDto {
   activeCostingVersion?: number;
   totalCostingVersions: number;
   latestCosting?: CostingResponseDto;
+  allCostingVersions?: CostingResponseDto[];
   lastCostUpdate?: Date;
   createdAt: Date;
   updatedAt: Date;

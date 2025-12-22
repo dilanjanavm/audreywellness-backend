@@ -46,65 +46,93 @@ export class UsersService {
    * Create a new user with email notification
    */
   async create(createUserDto: CreateUserDto): Promise<UserResponseDto> {
-    this.logger.log(`Creating user with email: ${createUserDto.email}`);
+    this.logger.log('═══════════════════════════════════════════════════════');
+    this.logger.log('📝 STEP 1: Starting user creation process');
+    this.logger.log(`   Email: ${createUserDto.email}`);
+    this.logger.log(`   Username: ${createUserDto.userName}`);
+    this.logger.log(`   Send Email: ${createUserDto.sendEmail !== false ? 'true (default)' : 'false'}`);
+    this.logger.log('═══════════════════════════════════════════════════════');
 
     try {
-      // Check if user with email already exists
+      // STEP 2: Check if user with email already exists
+      this.logger.log('📝 STEP 2: Checking if user with email already exists...');
       const existingUserByEmail = await this.usersRepository.findOne({
         where: { email: createUserDto.email },
       });
       if (existingUserByEmail) {
+        this.logger.error(`❌ STEP 2 FAILED: User with email ${createUserDto.email} already exists`);
         throw new BadRequestException(
           `User with email ${createUserDto.email} already exists`,
         );
       }
+      this.logger.log('✅ STEP 2 PASSED: Email is unique');
 
-      // Check if userName already exists
+      // STEP 3: Check if userName already exists
+      this.logger.log('📝 STEP 3: Checking if username already exists...');
       const existingUserByUserName = await this.usersRepository.findOne({
         where: { userName: createUserDto.userName },
       });
       if (existingUserByUserName) {
+        this.logger.error(`❌ STEP 3 FAILED: Username ${createUserDto.userName} already exists`);
         throw new BadRequestException(
           `User with username ${createUserDto.userName} already exists`,
         );
       }
+      this.logger.log('✅ STEP 3 PASSED: Username is unique');
 
-      // Check if mobileNumber exists (if provided)
+      // STEP 4: Check if mobileNumber exists (if provided)
       if (createUserDto.mobileNumber) {
+        this.logger.log('📝 STEP 4: Checking if mobile number already exists...');
         const existingUserByMobile = await this.usersRepository.findOne({
           where: { mobileNumber: createUserDto.mobileNumber },
         });
         if (existingUserByMobile) {
+          this.logger.error(`❌ STEP 4 FAILED: Mobile number ${createUserDto.mobileNumber} already exists`);
           throw new BadRequestException(
             `User with mobile number ${createUserDto.mobileNumber} already exists`,
           );
         }
+        this.logger.log('✅ STEP 4 PASSED: Mobile number is unique');
+      } else {
+        this.logger.log('⏭️  STEP 4 SKIPPED: No mobile number provided');
       }
 
-      // Validate role if provided
+      // STEP 5: Validate role if provided
       let role: Role | undefined;
       if (createUserDto.roleId) {
+        this.logger.log(`📝 STEP 5: Validating role with ID: ${createUserDto.roleId}...`);
         role = (await this.roleRepository.findOne({
           where: { id: createUserDto.roleId },
         })) ?? undefined;
         if (!role) {
+          this.logger.error(`❌ STEP 5 FAILED: Role with ID ${createUserDto.roleId} not found`);
           throw new NotFoundException(
             `Role with ID ${createUserDto.roleId} not found`,
           );
         }
         if (!role.isActive) {
+          this.logger.error(`❌ STEP 5 FAILED: Role ${role.name} is not active`);
           throw new BadRequestException(
             `Role ${role.name} is not active`,
           );
         }
+        this.logger.log(`✅ STEP 5 PASSED: Role ${role.name} is valid and active`);
+      } else {
+        this.logger.log('⏭️  STEP 5 SKIPPED: No role ID provided');
       }
 
-      // Generate password (use provided or generate temp password)
+      // STEP 6: Generate password
+      this.logger.log('📝 STEP 6: Generating password...');
       const tempPassword = createUserDto.password || this.generateTempPassword();
+      const passwordSource = createUserDto.password ? 'provided by user' : 'auto-generated';
+      this.logger.log(`   Password source: ${passwordSource}`);
+      this.logger.log(`   Password length: ${tempPassword.length} characters`);
       const salt = await bcrypt.genSalt();
       const hashedPassword = await bcrypt.hash(tempPassword, salt);
+      this.logger.log('✅ STEP 6 COMPLETED: Password generated and hashed');
 
-      // Create user
+      // STEP 7: Create user entity
+      this.logger.log('📝 STEP 7: Creating user entity...');
       const newUser = this.usersRepository.create({
         userName: createUserDto.userName,
         email: createUserDto.email,
@@ -120,33 +148,63 @@ export class UsersService {
         isActive: true,
         isEmailVerified: false,
       });
+      this.logger.log('✅ STEP 7 COMPLETED: User entity created');
 
+      // STEP 8: Save user to database
+      this.logger.log('📝 STEP 8: Saving user to database...');
       const savedUser = await this.usersRepository.save(newUser);
+      this.logger.log(`✅ STEP 8 COMPLETED: User saved with ID: ${savedUser.id}`);
 
-      // Send welcome email if requested (default: true)
-      if (createUserDto.sendEmail !== false) {
-        const emailSent = await this.emailService.sendWelcomeEmail(
-          savedUser.email,
-          savedUser.userName,
-          tempPassword,
-        );
-        if (!emailSent) {
-          this.logger.warn(
-            `Failed to send welcome email to ${savedUser.email}, but user was created`,
+      // STEP 9: Send welcome email
+      this.logger.log('═══════════════════════════════════════════════════════');
+      this.logger.log('📧 STEP 9: Email sending process');
+      this.logger.log('═══════════════════════════════════════════════════════');
+      
+      if (createUserDto.sendEmail === false) {
+        this.logger.log('⏭️  STEP 9 SKIPPED: sendEmail is set to false');
+      } else {
+        this.logger.log(`   Email will be sent to: ${savedUser.email}`);
+        this.logger.log(`   Username: ${savedUser.userName}`);
+        this.logger.log(`   Temporary Password: ${tempPassword}`);
+        
+        try {
+          this.logger.log('   📤 Attempting to send email...');
+          const emailSent = await this.emailService.sendWelcomeEmail(
+            savedUser.email,
+            savedUser.userName,
+            tempPassword,
           );
+          
+          if (emailSent) {
+            this.logger.log('✅ STEP 9 COMPLETED: Welcome email sent successfully');
+          } else {
+            this.logger.warn('⚠️  STEP 9 WARNING: Email sending returned false');
+            this.logger.warn(`   User was created successfully, but email may not have been sent to ${savedUser.email}`);
+            this.logger.warn('   Check email service logs for details');
+          }
+        } catch (emailError: any) {
+          this.logger.error('❌ STEP 9 ERROR: Exception occurred while sending email');
+          this.logger.error(`   Error: ${emailError.message}`);
+          this.logger.error(`   Stack: ${emailError.stack}`);
+          this.logger.warn('   User was created successfully despite email error');
         }
       }
 
-      this.logger.log(
-        `User created successfully: ${savedUser.id} (${savedUser.email})`,
-      );
+      this.logger.log('═══════════════════════════════════════════════════════');
+      this.logger.log('✅ USER CREATION PROCESS COMPLETED');
+      this.logger.log(`   User ID: ${savedUser.id}`);
+      this.logger.log(`   Email: ${savedUser.email}`);
+      this.logger.log(`   Username: ${savedUser.userName}`);
+      this.logger.log('═══════════════════════════════════════════════════════');
 
       return this.mapToResponseDto(savedUser, role);
     } catch (error) {
-      this.logger.error(
-        `Error creating user: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error('═══════════════════════════════════════════════════════');
+      this.logger.error('❌ USER CREATION PROCESS FAILED');
+      this.logger.error(`   Error: ${error.message}`);
+      this.logger.error(`   Stack: ${error.stack}`);
+      this.logger.error('═══════════════════════════════════════════════════════');
+      
       if (
         error instanceof BadRequestException ||
         error instanceof NotFoundException
@@ -235,19 +293,63 @@ export class UsersService {
   }
 
   /**
-   * Delete user (soft delete by setting isActive to false)
+   * Delete user (hard delete - permanently removes from database)
    */
   async remove(id: string): Promise<void> {
-    const user = await this.usersRepository.findOne({ where: { id } });
+    this.logger.log('═══════════════════════════════════════════════════════');
+    this.logger.log('🗑️  STEP 1: Starting user deletion process');
+    this.logger.log(`   User ID: ${id}`);
+    this.logger.log('═══════════════════════════════════════════════════════');
 
-    if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+    try {
+      // STEP 1: Check if user exists
+      this.logger.log('📝 STEP 1: Checking if user exists...');
+      const user = await this.usersRepository.findOne({ 
+        where: { id },
+        relations: ['role'],
+      });
+
+      if (!user) {
+        this.logger.error(`❌ STEP 1 FAILED: User with ID ${id} not found`);
+        throw new NotFoundException(`User with ID ${id} not found`);
+      }
+
+      this.logger.log(`✅ STEP 1 PASSED: User found`);
+      this.logger.log(`   Username: ${user.userName}`);
+      this.logger.log(`   Email: ${user.email}`);
+      this.logger.log(`   Is Active: ${user.isActive}`);
+
+      // STEP 2: Delete the user from database
+      this.logger.log('📝 STEP 2: Deleting user from database...');
+      const deleteResult = await this.usersRepository.delete({ id });
+
+      if (deleteResult.affected === 0) {
+        this.logger.error(`❌ STEP 2 FAILED: No rows were deleted`);
+        throw new NotFoundException(
+          `User with ID ${id} not found or could not be deleted`,
+        );
+      }
+
+      this.logger.log(`✅ STEP 2 COMPLETED: User deleted successfully`);
+      this.logger.log(`   Rows affected: ${deleteResult.affected}`);
+      this.logger.log('═══════════════════════════════════════════════════════');
+      this.logger.log(`✅ USER DELETION COMPLETED: ${id}`);
+      this.logger.log('═══════════════════════════════════════════════════════');
+    } catch (error: any) {
+      this.logger.error('═══════════════════════════════════════════════════════');
+      this.logger.error('❌ USER DELETION PROCESS FAILED');
+      this.logger.error(`   User ID: ${id}`);
+      this.logger.error(`   Error: ${error.message}`);
+      this.logger.error(`   Stack: ${error.stack}`);
+      this.logger.error('═══════════════════════════════════════════════════════');
+
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        `Failed to delete user: ${error.message}`,
+      );
     }
-
-    user.isActive = false;
-    await this.usersRepository.save(user);
-
-    this.logger.log(`User deactivated: ${id}`);
   }
 
   /**
