@@ -56,3 +56,8 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Files containing sensitive information (Google OAuth credentials)
+ENV_SETUP_INSTRUCTIONS.md
+docs/GOOGLE_EMAIL_SETUP.md
+# Note: scripts/generate-google-refresh-token.js is now sanitized and safe to commit

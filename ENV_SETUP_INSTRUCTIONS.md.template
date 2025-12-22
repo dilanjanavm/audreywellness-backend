@@ -1,0 +1,160 @@
+# Environment Variables Setup Instructions
+
+## Quick Fix for Email Configuration Error
+
+The error shows that `EMAIL_USER` is not configured. Follow these steps:
+
+### Step 1: Add Email Configuration to .env File
+
+**Option A: Use the Setup Script (Recommended)**
+```bash
+node scripts/setup-email-env.js
+```
+
+**Option B: Manually Add to .env File**
+
+Open your `.env` file and add these lines:
+
+```env
+# ============================================
+# Email Configuration - TEMPORARY VALUES (UPDATE THESE)
+# ============================================
+
+# Method 1: App Password (Easier - Recommended for Quick Setup)
+EMAIL_USE_OAUTH2=false
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-16-character-app-password-here
+
+# Method 2: OAuth2 (More Secure)
+# EMAIL_USE_OAUTH2=true
+# EMAIL_USER=your-email@gmail.com
+# GOOGLE_CLIENT_ID=YOUR_CLIENT_ID_HERE
+# GOOGLE_CLIENT_SECRET=YOUR_CLIENT_SECRET_HERE
+# GOOGLE_REFRESH_TOKEN=YOUR_REFRESH_TOKEN_HERE
+
+# Optional Settings
+EMAIL_FROM_NAME=Audrey Wellness
+EMAIL_REPLY_TO=support@audreywellness.com
+FRONTEND_URL=http://localhost:3000
+```
+
+### Step 2: Update the Values
+
+**For App Password Method (Easier):**
+
+1. Replace `your-email@gmail.com` with your actual Gmail address
+2. Generate an App Password:
+   - Go to: https://myaccount.google.com/apppasswords
+   - Enable 2-Step Verification if not already enabled
+   - Generate a new app password for "Mail"
+   - Copy the 16-character password
+3. Replace `your-16-character-app-password-here` with the app password
+4. Make sure `EMAIL_USE_OAUTH2=false`
+
+**For OAuth2 Method (More Secure):**
+
+1. Replace `your-email@gmail.com` with your actual Gmail address
+2. Get Refresh Token:
+   - Go to: https://developers.google.com/oauthplayground/
+   - Click Settings → Use your own OAuth credentials
+   - Enter Client ID and Secret (get from Google Cloud Console)
+   - Authorize and get refresh token
+   - See: `docs/GOOGLE_EMAIL_SETUP.md.template` for detailed steps
+3. Replace `YOUR_REFRESH_TOKEN_HERE` with the refresh token
+4. Make sure `EMAIL_USE_OAUTH2=true`
+
+### Step 3: Restart Server
+
+After updating `.env` file, restart your server:
+
+```bash
+# Stop the server (Ctrl+C)
+# Then start again
+npm run start:dev
+```
+
+### Step 4: Verify Configuration
+
+Check if email service is configured:
+
+```bash
+GET http://localhost:3005/email/status
+```
+
+Expected response:
+```json
+{
+  "message": "Email service status",
+  "data": {
+    "initialized": true,
+    "configured": true
+  }
+}
+```
+
+### Step 5: Test Email
+
+Send a test email:
+
+```bash
+POST http://localhost:3005/email/test
+Content-Type: application/json
+
+{
+  "to": "your-test-email@example.com"
+}
+```
+
+## Complete .env File Template
+
+If you need to create a complete `.env` file from scratch:
+
+```env
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=3366
+DB_USERNAME=root
+DB_PASSWORD=root
+DB_NAME=audreywellnessdb
+
+# Server Configuration
+PORT=3005
+
+# Email Configuration - App Password Method
+EMAIL_USE_OAUTH2=false
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-16-character-app-password-here
+
+# Optional Email Settings
+EMAIL_FROM_NAME=Audrey Wellness
+EMAIL_REPLY_TO=support@audreywellness.com
+FRONTEND_URL=http://localhost:3000
+```
+
+## Troubleshooting
+
+### Error: EMAIL_USER not configured
+- Make sure `.env` file exists in the project root
+- Check that `EMAIL_USER=your-email@gmail.com` is in the file
+- Restart the server after adding/updating `.env`
+
+### Error: Authentication failed (EAUTH)
+- For App Password: Verify the 16-character password is correct
+- For OAuth2: Verify refresh token is valid
+- Make sure 2-Step Verification is enabled for Gmail
+
+### Error: Connection failed (ECONNECTION)
+- Check your internet connection
+- Verify EMAIL_HOST and EMAIL_PORT are correct
+- Check firewall settings
+
+## Need Help?
+
+- Quick Setup Guide: `docs/GOOGLE_EMAIL_SETUP.md.template`
+- Full Documentation: `docs/EMAIL_SETUP.md`
+- API Documentation: `src/docs/EMAIL_API.md`
+

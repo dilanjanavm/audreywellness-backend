@@ -1,0 +1,146 @@
+# Google Email Setup - Quick Guide
+
+## Your OAuth2 Credentials
+
+⚠️ **IMPORTANT**: Replace these placeholders with your actual credentials from Google Cloud Console
+
+- **Client ID**: `YOUR_CLIENT_ID_HERE.apps.googleusercontent.com`  
+- **Client Secret**: `YOUR_CLIENT_SECRET_HERE`  
+- **Project ID**: `YOUR_PROJECT_ID`  
+- **Redirect URI**: `http://localhost:3000`
+
+## How to Get OAuth2 Credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable Gmail API:
+   - Navigate to "APIs & Services" → "Library"
+   - Search for "Gmail API"
+   - Click "Enable"
+4. Create OAuth 2.0 Credentials:
+   - Go to "APIs & Services" → "Credentials"
+   - Click "Create Credentials" → "OAuth client ID"
+   - Choose "Web application"
+   - Add authorized redirect URI: `http://localhost:3000`
+   - Copy the Client ID and Client Secret
+
+## What You Need
+
+You have the OAuth2 credentials, but you still need:
+1. **Refresh Token** - Required for the email service to work
+2. **EMAIL_USER** - Your Gmail address to send emails from
+
+## Method 1: Using Google OAuth Playground (Easiest)
+
+### Step 1: Go to OAuth Playground
+Visit: https://developers.google.com/oauthplayground/
+
+### Step 2: Configure OAuth Playground
+1. Click the **⚙️ Settings** icon (top right)
+2. Check **"Use your own OAuth credentials"**
+3. Enter:
+   - **OAuth Client ID**: `YOUR_CLIENT_ID_HERE.apps.googleusercontent.com`
+   - **OAuth Client secret**: `YOUR_CLIENT_SECRET_HERE`
+4. Click **Close**
+
+### Step 3: Authorize
+1. In the left panel, find **"Gmail API v1"**
+2. Expand it and check:
+   - ✅ `https://www.googleapis.com/auth/gmail.send`
+   - ✅ `https://www.googleapis.com/auth/gmail.compose`
+3. Click **"Authorize APIs"** button
+4. Sign in with your Gmail account
+5. Click **"Allow"** to grant permissions
+
+### Step 4: Get Refresh Token
+1. After authorization, you'll see an **"Exchange authorization code for tokens"** button
+2. Click it
+3. You'll see:
+   - **Access token** (temporary)
+   - **Refresh token** (this is what you need! ✅)
+4. Copy the **Refresh token**
+
+### Step 5: Add to .env File
+Add these to your `.env` file:
+
+```env
+EMAIL_USE_OAUTH2=true
+EMAIL_USER=your-email@gmail.com
+GOOGLE_CLIENT_ID=YOUR_CLIENT_ID_HERE.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=YOUR_CLIENT_SECRET_HERE
+GOOGLE_REFRESH_TOKEN=YOUR_REFRESH_TOKEN_HERE
+```
+
+## Method 2: Using the Script (Alternative)
+
+If you prefer a programmatic approach, you can use the provided script:
+
+```bash
+node scripts/generate-google-refresh-token.js
+```
+
+Follow the prompts to:
+1. Enter your Client ID
+2. Enter your Client Secret
+3. Authorize in the browser
+4. Get the refresh token
+
+## Method 3: App Password (Simpler Alternative)
+
+If OAuth2 seems complex, you can use App Password instead:
+
+1. Go to: https://myaccount.google.com/apppasswords
+2. Enable 2-Step Verification if not already enabled
+3. Generate a new app password for "Mail"
+4. Copy the 16-character password
+5. Add to `.env`:
+
+```env
+EMAIL_USE_OAUTH2=false
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-16-character-app-password
+```
+
+## Testing
+
+After setup, test the email service:
+
+```bash
+# Check status
+GET http://localhost:3005/email/status
+
+# Send test email
+POST http://localhost:3005/email/test
+Content-Type: application/json
+
+{
+  "to": "test@example.com"
+}
+```
+
+## Troubleshooting
+
+### "Invalid grant" error
+- Refresh token may have expired
+- Generate a new refresh token
+
+### "Access denied" error
+- Check that Gmail API is enabled in Google Cloud Console
+- Verify redirect URI matches exactly
+
+### "Client ID not found"
+- Double-check the Client ID in `.env`
+- Make sure there are no extra spaces
+
+## Security Notes
+
+⚠️ **Never commit these files to git:**
+- `.env` (already in .gitignore)
+- `ENV_SETUP_INSTRUCTIONS.md` (contains actual credentials)
+- `docs/GOOGLE_EMAIL_SETUP.md` (contains actual credentials)
+
+✅ **Safe to commit:**
+- `.env.example` (template only)
+- `ENV_SETUP_INSTRUCTIONS.md.template` (this file)
+- `docs/GOOGLE_EMAIL_SETUP.md.template` (this file)
+
