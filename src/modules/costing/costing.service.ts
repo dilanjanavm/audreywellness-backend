@@ -35,6 +35,8 @@ import {
   CostHistoryEntryDto,
   CostChangeDto,
 } from './dto/cost-history.dto';
+import { RecipesService } from '../recipes/recipes.service';
+import { RecipeResponseDto } from '../recipes/dto/recipe-response.dto';
 
 @Injectable()
 export class CostingService {
@@ -52,6 +54,7 @@ export class CostingService {
     @InjectRepository(CategoryEntity)
     private readonly categoryRepository: Repository<CategoryEntity>,
     private dataSource: DataSource,
+    private readonly recipesService: RecipesService, // Inject RecipesService
     //categoryRepository
   ) {}
 
@@ -1155,6 +1158,36 @@ export class CostingService {
           this.mapToResponseDto(costing),
         );
 
+        // Get active recipe for this item
+        let activeRecipe: RecipeResponseDto | null | undefined = null;
+        let recipeCount = 0;
+        try {
+          // Get all active recipes for this product
+          const activeRecipes = await this.recipesService.findAll({
+            productId: item.id,
+            status: 'active' as any, // RecipeStatus.ACTIVE
+            includeVersions: 'false',
+            page: 1,
+            limit: 100,
+          });
+          
+          // Find the recipe with isActiveVersion = true (selected version)
+          if (activeRecipes.data && activeRecipes.data.length > 0) {
+            const selectedRecipe = activeRecipes.data.find((r: any) => r.isActiveVersion === true);
+            if (selectedRecipe) {
+              // Get full recipe details
+              activeRecipe = await this.recipesService.findOne(selectedRecipe.id, false);
+            } else {
+              // If no active version, get the first one
+              activeRecipe = await this.recipesService.findOne(activeRecipes.data[0].id, false);
+            }
+            recipeCount = activeRecipes.total || activeRecipes.data.length;
+          }
+        } catch (error) {
+          // If recipe not found, continue without recipe data
+          console.log(`No recipe found for item ${item.id}:`, error.message);
+        }
+
         const product: CostedProductDto = {
           itemId: item.id,
           itemCode: item.itemCode,
@@ -1173,6 +1206,8 @@ export class CostingService {
           lastCostUpdate: latestCosting?.updatedAt,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
+          activeRecipe: activeRecipe || undefined,
+          recipeCount: recipeCount || undefined,
         };
 
         return product;
@@ -1270,11 +1305,48 @@ export class CostingService {
         activeCostingMap.set(costing.itemId, costing);
       });
 
+      // Get active recipes for all items
+      const recipeMap = new Map<string, any>();
+      const recipeCountMap = new Map<string, number>();
+      
+      // For each item, find its active recipe
+      for (const itemId of filteredItemIds) {
+          try {
+            const itemRecipes = await this.recipesService.findAll({
+              productId: itemId,
+              status: 'active' as any,
+              includeVersions: 'false',
+              page: 1,
+              limit: 100,
+            });
+
+            if (itemRecipes.data && itemRecipes.data.length > 0) {
+              // Find the recipe with isActiveVersion = true (selected version)
+              const selectedRecipe = itemRecipes.data.find((r: any) => r.isActiveVersion === true);
+              if (selectedRecipe) {
+                // Get full recipe details
+                const fullRecipe = await this.recipesService.findOne(selectedRecipe.id, false);
+                recipeMap.set(itemId, fullRecipe);
+              } else if (itemRecipes.data.length > 0) {
+                // If no active version, get the first one
+                const fullRecipe = await this.recipesService.findOne(itemRecipes.data[0].id, false);
+                recipeMap.set(itemId, fullRecipe);
+              }
+              recipeCountMap.set(itemId, itemRecipes.total || itemRecipes.data.length);
+            }
+        } catch (error) {
+          // If recipe not found for this item, continue
+          console.log(`No recipe found for item ${itemId}:`, error.message);
+        }
+      }
+
       // Map to response DTO
       const data: CostedProductDto[] = items.map((item) => {
         const itemCostings = costingMap.get(item.id) || [];
         const activeCosting = activeCostingMap.get(item.id);
         const latestCosting = latestCostingMap.get(item.id);
+        const activeRecipe = recipeMap.get(item.id);
+        const recipeCount = recipeCountMap.get(item.id);
 
         return {
           itemId: item.id,
@@ -1295,6 +1367,8 @@ export class CostingService {
           lastCostUpdate: latestCosting?.updatedAt,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
+          activeRecipe: activeRecipe || undefined,
+          recipeCount: recipeCount || undefined,
         };
       });
 

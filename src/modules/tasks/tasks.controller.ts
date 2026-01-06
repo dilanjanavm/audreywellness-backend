@@ -11,7 +11,6 @@ import {
   Put,
   Query,
   UseFilters,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
@@ -19,13 +18,10 @@ import * as taskInterface from '../../common/interfaces/task.interface';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { TaskStatus } from '../../common/enums/task.enum';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('tasks')
 @UseFilters(HttpExceptionFilter)
 @UseInterceptors(TransformInterceptor)
-@UseGuards(JwtAuthGuard)
 export class TasksController {
   private readonly logger = new Logger(TasksController.name);
 
@@ -34,34 +30,41 @@ export class TasksController {
   }
 
   @Get('phases')
-  async listPhases(
-    @Query('includeTasks') includeTasks?: string,
-    @CurrentUser() currentUser?: any,
-  ) {
+  async listPhases(@Query('includeTasks') includeTasks?: string) {
     this.logger.log(`GET /tasks/phases - includeTasks: ${includeTasks}`);
-    this.logger.log(`GET /tasks/phases - Current User: ${currentUser?.userId || 'N/A'}, Role: ${currentUser?.role || 'N/A'}`);
     try {
       const data = await this.tasksService.listPhases(
         this.parseBoolean(includeTasks),
-        currentUser,
       );
-      this.logger.log(`GET /tasks/phases - Success: ${data.length} phases found`);
+      this.logger.log(
+        `GET /tasks/phases - Success: ${data.length} phases found`,
+      );
       return { data };
     } catch (error) {
-      this.logger.error(`GET /tasks/phases - Error: ${error.message}`, error.stack);
+      this.logger.error(
+        `GET /tasks/phases - Error: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Post('phases')
   async createPhase(@Body() dto: taskInterface.CreatePhaseDto) {
-    this.logger.log(`POST /tasks/phases - Request body: ${JSON.stringify(dto)}`);
+    this.logger.log(
+      `POST /tasks/phases - Request body: ${JSON.stringify(dto)}`,
+    );
     try {
       const data = await this.tasksService.createPhase(dto);
-      this.logger.log(`POST /tasks/phases - Success: Phase created with ID ${data.id}`);
+      this.logger.log(
+        `POST /tasks/phases - Success: Phase created with ID ${data.id}`,
+      );
       return { data };
     } catch (error) {
-      this.logger.error(`POST /tasks/phases - Error: ${error.message}`, error.stack);
+      this.logger.error(
+        `POST /tasks/phases - Error: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -71,13 +74,18 @@ export class TasksController {
     @Param('phaseId') phaseId: string,
     @Body() dto: taskInterface.UpdatePhaseDto,
   ) {
-    this.logger.log(`PUT /tasks/phases/${phaseId} - Request body: ${JSON.stringify(dto)}`);
+    this.logger.log(
+      `PUT /tasks/phases/${phaseId} - Request body: ${JSON.stringify(dto)}`,
+    );
     try {
       const data = await this.tasksService.updatePhase(phaseId, dto);
       this.logger.log(`PUT /tasks/phases/${phaseId} - Success: Phase updated`);
       return { data };
     } catch (error) {
-      this.logger.error(`PUT /tasks/phases/${phaseId} - Error: ${error.message}`, error.stack);
+      this.logger.error(
+        `PUT /tasks/phases/${phaseId} - Error: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -87,13 +95,20 @@ export class TasksController {
     @Param('phaseId') phaseId: string,
     @Query('reassignPhaseId') reassignPhaseId?: string,
   ) {
-    this.logger.log(`DELETE /tasks/phases/${phaseId} - reassignPhaseId: ${reassignPhaseId}`);
+    this.logger.log(
+      `DELETE /tasks/phases/${phaseId} - reassignPhaseId: ${reassignPhaseId}`,
+    );
     try {
       await this.tasksService.removePhase(phaseId, reassignPhaseId);
-      this.logger.log(`DELETE /tasks/phases/${phaseId} - Success: Phase deleted`);
+      this.logger.log(
+        `DELETE /tasks/phases/${phaseId} - Success: Phase deleted`,
+      );
       return { data: null };
     } catch (error) {
-      this.logger.error(`DELETE /tasks/phases/${phaseId} - Error: ${error.message}`, error.stack);
+      this.logger.error(
+        `DELETE /tasks/phases/${phaseId} - Error: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -101,8 +116,10 @@ export class TasksController {
   @Post()
   async createTask(@Body() dto: taskInterface.CreateTaskDto) {
     this.logger.log(`POST /tasks - Request received`);
-    this.logger.debug(`POST /tasks - Request body: ${JSON.stringify(dto, null, 2)}`);
-    
+    this.logger.debug(
+      `POST /tasks - Request body: ${JSON.stringify(dto, null, 2)}`,
+    );
+
     try {
       // Validate required fields
       // taskId is optional - will be auto-generated if not provided
@@ -119,15 +136,21 @@ export class TasksController {
         throw new BadRequestException('status is required');
       }
 
-      this.logger.log(`POST /tasks - Creating task with taskId: ${dto.taskId}, phaseId: ${dto.phaseId}, status: ${dto.status}`);
-      
+      this.logger.log(
+        `POST /tasks - Creating task with taskId: ${dto.taskId}, phaseId: ${dto.phaseId}, status: ${dto.status}`,
+      );
+
       const data = await this.tasksService.createTask(dto);
-      
-      this.logger.log(`POST /tasks - Success: Task created with ID ${data.id}, taskId: ${data.taskId}`);
+
+      this.logger.log(
+        `POST /tasks - Success: Task created with ID ${data.id}, taskId: ${data.taskId}`,
+      );
       return { data };
     } catch (error) {
       this.logger.error(`POST /tasks - Error: ${error.message}`, error.stack);
-      this.logger.error(`POST /tasks - Request body was: ${JSON.stringify(dto, null, 2)}`);
+      this.logger.error(
+        `POST /tasks - Request body was: ${JSON.stringify(dto, null, 2)}`,
+      );
       throw error;
     }
   }
@@ -139,10 +162,15 @@ export class TasksController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('search') search?: string,
-    @CurrentUser() currentUser?: any,
   ) {
-    this.logger.log(`GET /tasks/phases/${phaseId}/tasks - Filters: ${JSON.stringify({ status, dateFrom, dateTo, search })}`);
-    this.logger.log(`GET /tasks/phases/${phaseId}/tasks - Current User: ${currentUser?.userId || 'N/A'}, Role: ${currentUser?.role || 'N/A'}`);
+    this.logger.log(
+      `GET /tasks/phases/${phaseId}/tasks - Filters: ${JSON.stringify({
+        status,
+        dateFrom,
+        dateTo,
+        search,
+      })}`,
+    );
     try {
       const filters: taskInterface.PhaseTaskFilters = {
         status: this.parseStatusArray(status),
@@ -151,11 +179,16 @@ export class TasksController {
         search: search?.trim() || undefined,
       };
 
-      const data = await this.tasksService.getPhaseTasks(phaseId, filters, currentUser);
-      this.logger.log(`GET /tasks/phases/${phaseId}/tasks - Success: ${data.data.length} tasks found`);
+      const data = await this.tasksService.getPhaseTasks(phaseId, filters);
+      this.logger.log(
+        `GET /tasks/phases/${phaseId}/tasks - Success: ${data.data.length} tasks found`,
+      );
       return { data };
     } catch (error) {
-      this.logger.error(`GET /tasks/phases/${phaseId}/tasks - Error: ${error.message}`, error.stack);
+      this.logger.error(
+        `GET /tasks/phases/${phaseId}/tasks - Error: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -165,10 +198,15 @@ export class TasksController {
     this.logger.log(`GET /tasks/reference/statuses - Getting status reference`);
     try {
       const data = this.tasksService.getStatusReference();
-      this.logger.log(`GET /tasks/reference/statuses - Success: ${data.length} statuses found`);
+      this.logger.log(
+        `GET /tasks/reference/statuses - Success: ${data.length} statuses found`,
+      );
       return { data };
     } catch (error) {
-      this.logger.error(`GET /tasks/reference/statuses - Error: ${error.message}`, error.stack);
+      this.logger.error(
+        `GET /tasks/reference/statuses - Error: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -191,7 +229,10 @@ export class TasksController {
     );
 
     try {
-      if (!createCommentDto.comment || createCommentDto.comment.trim().length === 0) {
+      if (
+        !createCommentDto.comment ||
+        createCommentDto.comment.trim().length === 0
+      ) {
         throw new BadRequestException('Comment is required');
       }
 
@@ -313,6 +354,32 @@ export class TasksController {
     }
   }
 
+  /**
+   * Get enhanced task details with all related data
+   * ⭐ NEW - Returns task, recipe, costedProduct, recipeExecution, comments, and phases
+   */
+  @Get(':taskId/details')
+  async getTaskDetailsEnhanced(@Param('taskId') taskId: string) {
+    this.logger.log(`GET /tasks/${taskId}/details - Request received`);
+
+    try {
+      const data = await this.tasksService.getTaskDetailsEnhanced(taskId);
+      this.logger.log(
+        `GET /tasks/${taskId}/details - Success: Task details retrieved`,
+      );
+      return {
+        statusCode: 200,
+        data,
+      };
+    } catch (error) {
+      this.logger.error(
+        `GET /tasks/${taskId}/details - Error: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
   // ========== TASK CRUD ENDPOINTS ==========
   // These generic :taskId routes come AFTER more specific routes
 
@@ -321,13 +388,18 @@ export class TasksController {
     @Param('taskId') taskId: string,
     @Body() dto: taskInterface.UpdateTaskDto,
   ) {
-    this.logger.log(`PUT /tasks/${taskId} - Request body: ${JSON.stringify(dto)}`);
+    this.logger.log(
+      `PUT /tasks/${taskId} - Request body: ${JSON.stringify(dto)}`,
+    );
     try {
       const data = await this.tasksService.updateTask(taskId, dto);
       this.logger.log(`PUT /tasks/${taskId} - Success: Task updated`);
       return { data };
     } catch (error) {
-      this.logger.error(`PUT /tasks/${taskId} - Error: ${error.message}`, error.stack);
+      this.logger.error(
+        `PUT /tasks/${taskId} - Error: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -337,13 +409,20 @@ export class TasksController {
     @Param('taskId') taskId: string,
     @Body() dto: taskInterface.TaskPositionDto,
   ) {
-    this.logger.log(`PATCH /tasks/${taskId}/position - Request body: ${JSON.stringify(dto)}`);
+    this.logger.log(
+      `PATCH /tasks/${taskId}/position - Request body: ${JSON.stringify(dto)}`,
+    );
     try {
       const data = await this.tasksService.updateTaskPosition(taskId, dto);
-      this.logger.log(`PATCH /tasks/${taskId}/position - Success: Task position updated`);
+      this.logger.log(
+        `PATCH /tasks/${taskId}/position - Success: Task position updated`,
+      );
       return { data };
     } catch (error) {
-      this.logger.error(`PATCH /tasks/${taskId}/position - Error: ${error.message}`, error.stack);
+      this.logger.error(
+        `PATCH /tasks/${taskId}/position - Error: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -356,7 +435,10 @@ export class TasksController {
       this.logger.log(`DELETE /tasks/${taskId} - Success: Task deleted`);
       return { data: null };
     } catch (error) {
-      this.logger.error(`DELETE /tasks/${taskId} - Error: ${error.message}`, error.stack);
+      this.logger.error(
+        `DELETE /tasks/${taskId} - Error: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }

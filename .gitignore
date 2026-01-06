@@ -11,7 +11,8 @@ pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
-
+GOOGLE_EMAIL_SETUP
+.setup-email-env.js
 # OS
 .DS_Store
 

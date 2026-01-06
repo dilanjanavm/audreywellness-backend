@@ -1,6 +1,7 @@
 // src/modules/costing/dto/cost-history.dto.ts
 import { CostingResponseDto } from './costing-response.dto';
 import { BatchSize } from '../../../common/enums/batch.enum';
+import { RecipeResponseDto } from '../../recipes/dto/recipe-response.dto';
 
 export class CostChangeDto {
   batchSize: BatchSize;
@@ -48,6 +49,10 @@ export class CostedProductDto {
   lastCostUpdate?: Date;
   createdAt: Date;
   updatedAt: Date;
+  // Recipe information
+  activeRecipe?: RecipeResponseDto; // Active/selected recipe version
+  recipes?: RecipeResponseDto[]; // All recipes for this product (optional, for detailed view)
+  recipeCount?: number; // Total number of recipes
 }
 
 export class PaginatedCostedProductsResponse {

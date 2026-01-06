@@ -9,6 +9,7 @@ import { CostingAdditionalCost } from './entities/costing-additional-cost.entity
 import { CostingTotalCost } from './entities/costing-total-cost.entity';
 import { ItemEntity } from '../item/entities/item.entity';
 import { CategoryEntity } from '../category/entities/category.entity';
+import { RecipesModule } from '../recipes/recipes.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { CategoryEntity } from '../category/entities/category.entity';
       ItemEntity,
       CategoryEntity,
     ]),
+    RecipesModule, // Import RecipesModule to access RecipesService
   ],
   controllers: [CostingController],
   providers: [CostingService],

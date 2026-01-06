@@ -34,6 +34,10 @@ import {
   MoveTaskDto,
   TaskMovementHistoryResponseDto,
 } from '../../common/interfaces/task.interface';
+import { TaskDetailResponseDto } from '../../common/interfaces/task-detail.interface';
+import { CostingService } from '../costing/costing.service';
+import { RecipesService } from '../recipes/recipes.service';
+import { RecipeExecutionService } from './recipe-execution.service';
 
 @Injectable()
 export class TasksService {
@@ -52,6 +56,9 @@ export class TasksService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(CostingEntity)
     private readonly costingRepository: Repository<CostingEntity>,
+    private readonly costingService: CostingService,
+    private readonly recipesService: RecipesService,
+    private readonly recipeExecutionService: RecipeExecutionService,
   ) {
     this.logger.log('TasksService initialized');
   }
@@ -488,10 +495,24 @@ export class TasksService {
       const saved = await this.taskRepository.save(task);
       this.logger.log(`createTask - Task created successfully with ID: ${saved.id}, taskId: ${saved.taskId}`);
 
+      // Auto-bind recipe execution if task has a costing
+      if (saved.costingId) {
+        try {
+          this.logger.debug(`createTask - Auto-binding recipe for task ${saved.taskId}`);
+          await this.recipeExecutionService.findOrCreateExecution(saved.taskId);
+          this.logger.log(`createTask - Recipe execution auto-bound for task ${saved.taskId}`);
+        } catch (error: any) {
+          // Log warning but don't fail task creation if recipe binding fails
+          this.logger.warn(
+            `createTask - Failed to auto-bind recipe for task ${saved.taskId}: ${error.message}`,
+          );
+        }
+      }
+
       // Reload task with relations for response
       const taskWithRelations = await this.taskRepository.findOne({
         where: { id: saved.id },
-        relations: ['phase', 'assignedUser', 'costing'],
+        relations: ['phase', 'assignedUser', 'costing', 'recipeExecution'],
       });
 
       const response = this.mapTaskToResponseDto(taskWithRelations!);
@@ -1162,7 +1183,7 @@ export class TasksService {
       this.logger.debug(`findTaskByTaskIdOrThrow - Searching by UUID id: ${identifier}`);
       task = await this.taskRepository.findOne({
         where: { id: identifier },
-        relations: ['phase', 'assignedUser', 'costing', 'commentList', 'commentList.owner'],
+        relations: ['phase', 'assignedUser', 'costing', 'commentList', 'commentList.owner', 'recipeExecution'],
       });
     }
 
@@ -1173,7 +1194,7 @@ export class TasksService {
       );
       task = await this.taskRepository.findOne({
         where: { taskId: identifier },
-        relations: ['phase', 'assignedUser', 'costing', 'commentList', 'commentList.owner'],
+        relations: ['phase', 'assignedUser', 'costing', 'commentList', 'commentList.owner', 'recipeExecution'],
       });
     }
 
@@ -1300,5 +1321,356 @@ export class TasksService {
           .join(', ')}`,
       );
     }
+  }
+
+  /**
+   * Get detailed task information including comments, costing, and recipe
+   */
+  async getTaskDetails(taskId: string): Promise<TaskDetailResponseDto> {
+    this.logger.log(`getTaskDetails - Fetching details for taskId: ${taskId}`);
+
+    // Find task with all relations
+    const task = await this.findTaskByTaskIdOrThrow(taskId);
+
+    // Map task to response DTO
+    const taskResponse = this.mapTaskToResponseDto(task);
+
+    // Get comments
+    const comments = (task.commentList || []).map((comment) => ({
+      id: comment.id,
+      taskId: comment.taskId,
+      comment: comment.comment,
+      ownerId: comment.ownerId,
+      owner: comment.owner
+        ? {
+            id: comment.owner.id,
+            userName: comment.owner.userName,
+            email: comment.owner.email,
+          }
+        : undefined,
+      ownerName: comment.ownerName,
+      ownerEmail: comment.ownerEmail,
+      commentedDate: comment.commentedDate,
+      createdAt: comment.createdAt,
+      updatedAt: comment.updatedAt,
+    }));
+
+    let costedProduct: any = null;
+    let recipe: any = null;
+
+    // Get costing and product details if costingId exists
+    if (task.costingId && task.costing) {
+      try {
+        // Get the itemId from the costing
+        const itemId = task.costing.itemId;
+
+        // Get costed product details
+        const costedProductData = await this.costingService.getCostedProducts(
+          1,
+          1,
+          undefined,
+          undefined,
+          itemId,
+        );
+
+        if (costedProductData && !('data' in costedProductData)) {
+          costedProduct = costedProductData;
+
+          // Get active recipe for this product
+          if (costedProduct && costedProduct.itemId) {
+            try {
+              // Get all active recipes for this product
+              const activeRecipes = await this.recipesService.findAll({
+                productId: costedProduct.itemId,
+                status: 'active' as any,
+                includeVersions: 'false',
+                page: 1,
+                limit: 100,
+              });
+
+              // Find the recipe with isActiveVersion = true (selected version)
+              if (activeRecipes.data && activeRecipes.data.length > 0) {
+                const selectedRecipe = activeRecipes.data.find(
+                  (r: any) => r.isActiveVersion === true,
+                );
+                if (selectedRecipe) {
+                  // Get full recipe details
+                  recipe = await this.recipesService.findOne(selectedRecipe.id, false);
+                } else if (activeRecipes.data.length > 0) {
+                  // If no active version, get the first one
+                  recipe = await this.recipesService.findOne(activeRecipes.data[0].id, false);
+                }
+              }
+            } catch (error: any) {
+              this.logger.warn(
+                `getTaskDetails - No recipe found for item ${costedProduct.itemId}: ${error.message}`,
+              );
+            }
+          }
+        }
+      } catch (error: any) {
+        this.logger.warn(
+          `getTaskDetails - Error fetching costed product: ${error.message}`,
+        );
+      }
+    }
+
+    // Get recipe execution status if exists
+    let recipeExecution: any = undefined;
+    if (task.recipeExecutionId) {
+      try {
+        recipeExecution = await this.recipeExecutionService.getExecutionStatus(
+          task.taskId,
+        );
+      } catch (error: any) {
+        this.logger.warn(
+          `getTaskDetails - Error fetching recipe execution: ${error.message}`,
+        );
+      }
+    }
+
+    return {
+      task: taskResponse,
+      comments,
+      costedProduct: costedProduct || undefined,
+      recipe: recipe || undefined,
+      recipeExecution: recipeExecution || undefined,
+    };
+  }
+
+  /**
+   * Get enhanced task details with all related data for frontend
+   * Returns data in the exact structure expected by frontend
+   */
+  async getTaskDetailsEnhanced(taskId: string): Promise<any> {
+    this.logger.log(`getTaskDetailsEnhanced - Fetching enhanced details for taskId: ${taskId}`);
+
+    // Find task with all relations
+    const task = await this.findTaskByTaskIdOrThrow(taskId);
+
+    // Map task to response DTO with all fields
+    const taskResponse = this.mapTaskToResponseDto(task);
+
+    // Get all phases
+    const phases = await this.phaseRepository.find({
+      order: { order: 'ASC', createdAt: 'ASC' },
+    });
+
+    // Get comments
+    const comments = (task.commentList || []).map((comment) => ({
+      id: comment.id,
+      taskId: comment.taskId,
+      userId: comment.ownerId,
+      user: comment.owner
+        ? {
+            id: comment.owner.id,
+            userName: comment.owner.userName,
+            email: comment.owner.email,
+            avatar: undefined, // Add if available
+          }
+        : undefined,
+      content: comment.comment,
+      createdAt: comment.commentedDate || comment.createdAt,
+      updatedAt: comment.updatedAt,
+    }));
+
+    let costedProduct: any = null;
+    let recipe: any = null;
+
+    // Get costing and product details if costingId exists
+    if (task.costingId && task.costing) {
+      try {
+        // Get the itemId from the costing
+        const itemId = task.costing.itemId;
+
+        // Get costed product details
+        const costedProductData = await this.costingService.getCostedProducts(
+          1,
+          1,
+          undefined,
+          undefined,
+          itemId,
+        );
+
+        if (costedProductData && !('data' in costedProductData)) {
+          costedProduct = costedProductData;
+
+          // Get active recipe for this product
+          if (costedProduct && costedProduct.itemId) {
+            try {
+              // Get all active recipes for this product
+              const activeRecipes = await this.recipesService.findAll({
+                productId: costedProduct.itemId,
+                status: 'active' as any,
+                includeVersions: 'false',
+                page: 1,
+                limit: 100,
+              });
+
+              // Find the recipe with isActiveVersion = true (selected version)
+              if (activeRecipes.data && activeRecipes.data.length > 0) {
+                const selectedRecipe = activeRecipes.data.find(
+                  (r: any) => r.isActiveVersion === true,
+                );
+                if (selectedRecipe) {
+                  // Get full recipe details with versions
+                  recipe = await this.recipesService.findOne(selectedRecipe.id, false);
+                } else if (activeRecipes.data.length > 0) {
+                  // If no active version, get the first one
+                  recipe = await this.recipesService.findOne(activeRecipes.data[0].id, false);
+                }
+              }
+            } catch (error: any) {
+              this.logger.warn(
+                `getTaskDetailsEnhanced - No recipe found for item ${costedProduct.itemId}: ${error.message}`,
+              );
+            }
+          }
+        }
+      } catch (error: any) {
+        this.logger.warn(
+          `getTaskDetailsEnhanced - Error fetching costed product: ${error.message}`,
+        );
+      }
+    }
+
+    // Get recipe execution status if exists
+    let recipeExecution: any = null;
+    if (task.recipeExecutionId) {
+      try {
+        const executionStatus = await this.recipeExecutionService.getExecutionStatus(
+          task.taskId,
+        );
+        
+        // Get full recipe for recipeExecution.recipe
+        const fullRecipe = executionStatus.recipe || recipe;
+        
+        // Format recipeExecution to match frontend expectations
+        recipeExecution = {
+          id: executionStatus.id,
+          taskId: task.id,
+          recipeId: fullRecipe?.id,
+          status: executionStatus.status,
+          currentStep: executionStatus.currentStep
+            ? {
+                stepOrder: executionStatus.currentStep.stepOrder,
+                startedAt: executionStatus.currentStep.startedAt,
+                progress: executionStatus.currentStep.progress,
+                elapsedTime: executionStatus.currentStep.elapsedTime,
+              }
+            : null,
+          overallProgress: executionStatus.overallProgress,
+          elapsedTime: executionStatus.elapsedTime,
+          startedAt: executionStatus.startedAt || null,
+          pausedAt: executionStatus.pausedAt || null,
+          resumedAt: executionStatus.resumedAt || null,
+          completedAt: executionStatus.completedAt || null,
+          cancelledAt: null,
+          stepExecutions: executionStatus.stepExecutions.map((se) => ({
+            id: se.id,
+            stepOrder: se.stepOrder,
+            status: se.status,
+            startedAt: se.startedAt || null,
+            completedAt: se.completedAt || null,
+            progress: se.progress,
+            elapsedTime: se.actualDuration || null,
+            actualDuration: se.actualDuration || null,
+            actualTemperature: se.actualTemperature || null,
+            notes: se.notes || null,
+          })),
+          recipe: fullRecipe
+            ? {
+                id: fullRecipe.id,
+                name: fullRecipe.name,
+                steps: (fullRecipe.steps || [])
+                  .sort((a, b) => a.order - b.order)
+                  .map((step) => ({
+                    id: step.id,
+                    order: step.order,
+                    instruction: step.instruction,
+                    temperature: step.temperature,
+                    duration: step.duration,
+                  })),
+                totalTime: fullRecipe.totalTime,
+              }
+            : null,
+          createdAt: task.createdAt,
+          updatedAt: task.updatedAt,
+        };
+      } catch (error: any) {
+        this.logger.warn(
+          `getTaskDetailsEnhanced - Error fetching recipe execution: ${error.message}`,
+        );
+      }
+    } else if (recipe) {
+      // If no execution but recipe exists, create a not_started execution object
+      // with stepExecutions for all recipe steps (pending status)
+      const sortedSteps = (recipe.steps || []).sort((a, b) => a.order - b.order);
+      
+      recipeExecution = {
+        id: null,
+        taskId: task.id,
+        recipeId: recipe.id,
+        status: 'not_started',
+        currentStep: null,
+        overallProgress: 0,
+        elapsedTime: 0,
+        startedAt: null,
+        pausedAt: null,
+        resumedAt: null,
+        completedAt: null,
+        cancelledAt: null,
+        stepExecutions: sortedSteps.map((step) => ({
+          id: null,
+          stepOrder: step.order,
+          status: 'pending',
+          startedAt: null,
+          completedAt: null,
+          progress: 0,
+          elapsedTime: null,
+          actualDuration: null,
+          actualTemperature: null,
+          notes: null,
+        })),
+        recipe: {
+          id: recipe.id,
+          name: recipe.name,
+          steps: sortedSteps.map((step) => ({
+            id: step.id,
+            order: step.order,
+            instruction: step.instruction,
+            temperature: step.temperature,
+            duration: step.duration,
+          })),
+          totalTime: recipe.totalTime,
+        },
+        createdAt: task.createdAt,
+        updatedAt: task.updatedAt,
+      };
+    }
+
+    // Format recipe steps to be sorted by order
+    if (recipe && recipe.steps) {
+      recipe.steps = recipe.steps.sort((a, b) => a.order - b.order);
+    }
+
+    return {
+      task: {
+        ...taskResponse,
+        commentList: [], // Empty array as per frontend expectation
+      },
+      recipe: recipe || null,
+      costedProduct: costedProduct || null,
+      recipeExecution: recipeExecution,
+      comments: comments,
+      phases: phases.map((phase) => ({
+        id: phase.id,
+        name: phase.name,
+        description: phase.description || null,
+        order: phase.order,
+        createdAt: phase.createdAt,
+        updatedAt: phase.updatedAt,
+      })),
+    };
   }
 }

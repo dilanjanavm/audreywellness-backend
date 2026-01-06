@@ -5,6 +5,7 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
   RelationId,
   UpdateDateColumn,
@@ -14,6 +15,7 @@ import { TaskPriority, TaskStatus } from '../../../common/enums/task.enum';
 import { User } from '../../users/user.entity';
 import { CostingEntity } from '../../costing/entities/costing.entity';
 import { TaskCommentEntity } from './task-comment.entity';
+import { TaskRecipeExecutionEntity } from './task-recipe-execution.entity';
 
 @Entity('tasks')
 export class TaskEntity {
@@ -108,6 +110,14 @@ export class TaskEntity {
 
   @Column({ type: 'int', unsigned: true, default: 0 })
   views: number;
+
+  // Recipe execution relation
+  @OneToOne(() => TaskRecipeExecutionEntity, { nullable: true })
+  @JoinColumn({ name: 'recipe_execution_id' })
+  recipeExecution?: TaskRecipeExecutionEntity;
+
+  @Column({ name: 'recipe_execution_id', nullable: true })
+  recipeExecutionId?: string;
 
   @Column({ nullable: true })
   createdBy?: string;
