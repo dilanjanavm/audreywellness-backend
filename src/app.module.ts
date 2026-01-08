@@ -19,6 +19,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { RolePermissionsModule } from './modules/role-permissions/role-permissions.module';
 import { RecipesModule } from './modules/recipes/recipes.module';
+import { CourierModule } from './modules/courier/courier.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { RecipesModule } from './modules/recipes/recipes.module';
         configService.get('database') as TypeOrmModuleOptions,
       inject: [ConfigService],
     }),
+
 
     // Your feature modules
     AuthModule,
@@ -53,6 +55,7 @@ import { RecipesModule } from './modules/recipes/recipes.module';
     PermissionsModule,
     RolePermissionsModule,
     RecipesModule,
+    CourierModule,
   ],
   controllers: [],
   providers: [],
