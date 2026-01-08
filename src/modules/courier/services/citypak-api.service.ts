@@ -24,11 +24,15 @@ export class CitypakApiService {
       : this.configService.get<string>('CITYPAK_STAGING_URL') ||
         'https://staging.citypak.lk';
 
-    this.apiToken = isProduction
+    const token = isProduction
       ? this.configService.get<string>('CITYPAK_PRODUCTION_API_TOKEN') ||
-        this.configService.get<string>('CITYPAK_API_TOKEN')
+        this.configService.get<string>('CITYPAK_API_TOKEN') ||
+        ''
       : this.configService.get<string>('CITYPAK_STAGING_API_TOKEN') ||
-        this.configService.get<string>('CITYPAK_API_TOKEN');
+        this.configService.get<string>('CITYPAK_API_TOKEN') ||
+        '';
+
+    this.apiToken = token;
 
     if (!this.apiToken) {
       this.logger.warn(

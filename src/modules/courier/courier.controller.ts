@@ -10,7 +10,7 @@ import {
   HttpStatus,
   ParseArrayPipe,
 } from '@nestjs/common';
-import { Response } from 'express';
+import express from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CourierTrackingService } from './services/courier-tracking.service';
 import { CitypakApiService } from './services/citypak-api.service';
@@ -77,9 +77,9 @@ export class CourierController {
   @UseGuards(JwtAuthGuard)
   async printWaybillsByOrderId(
     @Param('orderId') orderId: number,
+    @Res() res: express.Response,
     @Query('page_size') pageSize: 'A4' | '4X6' = 'A4',
     @Query('per_page_waybill_count') perPageWaybillCount: number = 4,
-    @Res() res: Response,
   ): Promise<void> {
     const pdfBuffer = await this.citypakApiService.printWaybillsByOrderId(
       Number(orderId),
@@ -103,11 +103,11 @@ export class CourierController {
   @Get('waybills')
   @UseGuards(JwtAuthGuard)
   async printWaybillsByTrackingNumbers(
+    @Res() res: express.Response,
     @Query('tracking_numbers', new ParseArrayPipe({ items: String, separator: ',', optional: true }))
     trackingNumbers?: string | string[],
     @Query('page_size') pageSize: 'A4' | '4X6' = 'A4',
     @Query('per_page_waybill_count') perPageWaybillCount: number = 4,
-    @Res() res: Response,
   ): Promise<void> {
     // Handle both array and comma-separated string formats
     let trackingNumbersArray: string[] = [];
