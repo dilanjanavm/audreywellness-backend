@@ -118,13 +118,23 @@ export class ComplaintService {
         `🔄 Creating complaint for customer: ${createComplaintDto.customerEmail}`,
       );
 
-      // Step 1: Find or create customer
+      // Step 1: Validate assigned employee exists
+      if (!createComplaintDto.assignedToId) {
+        throw new BadRequestException('assignedToId is required');
+      }
+
+      // Validate assigned employee exists (will throw NotFoundException if not found)
+      const assignedUser = await this.userService.findOne(
+        createComplaintDto.assignedToId,
+      );
+
+      // Step 2: Find or create customer
       const customer = await this.findOrCreateCustomer(createComplaintDto);
 
-      // Step 2: Generate complaint number
+      // Step 3: Generate complaint number
       const complaintNumber = await this.generateComplaintNumber();
 
-      // Step 3: Create complaint
+      // Step 4: Create complaint with ASSIGNED status (since employee is assigned)
       const complaint = this.complaintRepository.create({
         complaintNumber,
         customerId: customer?.id,
@@ -132,20 +142,29 @@ export class ComplaintService {
         description: createComplaintDto.description,
         category: createComplaintDto.category,
         priority: createComplaintDto.priority || PriorityLevel.MEDIUM,
-        status: ComplaintStatus.OPEN,
-        assignedToId: createComplaintDto.assignedToId || createdById,
+        status: ComplaintStatus.ASSIGNED, // Start with ASSIGNED since employee is assigned
+        assignedToId: createComplaintDto.assignedToId,
         targetResolutionDate: createComplaintDto.targetResolutionDate,
       });
 
       const savedComplaint = await this.complaintRepository.save(complaint);
 
-      // Step 4: Create initial timeline entry
+      // Step 5: Create initial timeline entries
+      await this.createTimelineEntry(
+        savedComplaint.id,
+        createdById,
+        TimelineEntryType.STATUS_CHANGE,
+        `Complaint created and assigned to ${assignedUser.userName || assignedUser.email}`,
+      );
 
       console.log(`✅ Complaint created successfully: ${complaintNumber}`);
 
       return this.mapToResponseDto(savedComplaint);
     } catch (error) {
       console.error('❌ Error creating complaint:', error);
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
       throw new InternalServerErrorException('Failed to create complaint');
     }
   }
@@ -300,8 +319,12 @@ export class ComplaintService {
         );
 
         // Set resolution date if status is RESOLVED
+        const resolvedStatuses = [
+          ComplaintStatus.RESOLVED,
+          ComplaintStatus.AWAITING_FEEDBACK, // Legacy
+        ];
         if (
-          updateComplaintDto.status === ComplaintStatus.RESOLVED &&
+          resolvedStatuses.includes(updateComplaintDto.status) &&
           !complaint.actualResolutionDate
         ) {
           updateComplaintDto.actualResolutionDate = new Date();
@@ -360,8 +383,12 @@ export class ComplaintService {
       };
 
       // Set resolution date if status is RESOLVED
+      const resolvedStatuses = [
+        ComplaintStatus.RESOLVED,
+        ComplaintStatus.AWAITING_FEEDBACK, // Legacy
+      ];
       if (
-        updateStatusDto.status === ComplaintStatus.RESOLVED &&
+        resolvedStatuses.includes(updateStatusDto.status) &&
         !complaint.actualResolutionDate
       ) {
         updateData.actualResolutionDate = new Date();
@@ -402,34 +429,80 @@ export class ComplaintService {
     currentStatus: ComplaintStatus,
     newStatus: ComplaintStatus,
   ): void {
+    // Map legacy statuses to new ones for validation
+    const normalizeStatus = (status: ComplaintStatus): ComplaintStatus => {
+      const legacyMap: Partial<Record<ComplaintStatus, ComplaintStatus>> = {
+        [ComplaintStatus.OPEN]: ComplaintStatus.RECEIVED,
+        [ComplaintStatus.AWAITING_FEEDBACK]: ComplaintStatus.AWAITING_CUSTOMER,
+        [ComplaintStatus.REOPENED]: ComplaintStatus.RECEIVED,
+      };
+      return legacyMap[status] || status;
+    };
+
+    const normalizedCurrent = normalizeStatus(currentStatus);
+    const normalizedNew = normalizeStatus(newStatus);
+
+    // If it's the same status, allow it (for legacy compatibility)
+    if (currentStatus === newStatus) {
+      return;
+    }
+
     const validTransitions: Record<ComplaintStatus, ComplaintStatus[]> = {
-      [ComplaintStatus.OPEN]: [
+      [ComplaintStatus.RECEIVED]: [
+        ComplaintStatus.ASSIGNED,
+        ComplaintStatus.REJECTED,
+      ],
+      [ComplaintStatus.ASSIGNED]: [
         ComplaintStatus.IN_PROGRESS,
-        ComplaintStatus.RESOLVED,
-        ComplaintStatus.CLOSED,
+        ComplaintStatus.ON_HOLD,
+        ComplaintStatus.REJECTED,
       ],
       [ComplaintStatus.IN_PROGRESS]: [
+        ComplaintStatus.ON_HOLD,
+        ComplaintStatus.AWAITING_CUSTOMER,
         ComplaintStatus.RESOLVED,
-        ComplaintStatus.OPEN,
-        ComplaintStatus.CLOSED,
+        ComplaintStatus.REJECTED,
+      ],
+      [ComplaintStatus.ON_HOLD]: [
+        ComplaintStatus.IN_PROGRESS,
+        ComplaintStatus.AWAITING_CUSTOMER,
+        ComplaintStatus.REJECTED,
+      ],
+      [ComplaintStatus.AWAITING_CUSTOMER]: [
+        ComplaintStatus.IN_PROGRESS,
+        ComplaintStatus.RESOLVED,
+        ComplaintStatus.REJECTED,
       ],
       [ComplaintStatus.RESOLVED]: [
         ComplaintStatus.CLOSED,
-        ComplaintStatus.AWAITING_FEEDBACK,
-        ComplaintStatus.REOPENED,
+        ComplaintStatus.AWAITING_CUSTOMER, // Can reopen if customer feedback needed
+      ],
+      [ComplaintStatus.CLOSED]: [
+        ComplaintStatus.RECEIVED, // Can reopen a closed complaint
+      ],
+      [ComplaintStatus.REJECTED]: [
+        ComplaintStatus.RECEIVED, // Can reopen a rejected complaint
+      ],
+      // Legacy statuses for backward compatibility
+      [ComplaintStatus.OPEN]: [
+        ComplaintStatus.ASSIGNED,
+        ComplaintStatus.IN_PROGRESS,
+        ComplaintStatus.REJECTED,
       ],
       [ComplaintStatus.AWAITING_FEEDBACK]: [
         ComplaintStatus.CLOSED,
-        ComplaintStatus.REOPENED,
-      ],
-      [ComplaintStatus.CLOSED]: [ComplaintStatus.REOPENED],
-      [ComplaintStatus.REOPENED]: [
-        ComplaintStatus.IN_PROGRESS,
         ComplaintStatus.RESOLVED,
+      ],
+      [ComplaintStatus.REOPENED]: [
+        ComplaintStatus.ASSIGNED,
+        ComplaintStatus.IN_PROGRESS,
       ],
     };
 
-    if (!validTransitions[currentStatus]?.includes(newStatus)) {
+    const allowedTransitions =
+      validTransitions[normalizedCurrent] || validTransitions[currentStatus] || [];
+
+    if (!allowedTransitions.includes(normalizedNew) && !allowedTransitions.includes(newStatus)) {
       throw new BadRequestException(
         `Invalid status transition from ${currentStatus} to ${newStatus}`,
       );

@@ -17,7 +17,7 @@ export interface CreateComplaintDto {
   category: ComplaintCategory;
   priority?: PriorityLevel;
 
-  assignedToId?: string;
+  assignedToId: string; // Required: Employee must be assigned when creating complaint
   targetResolutionDate: Date;
 }
 

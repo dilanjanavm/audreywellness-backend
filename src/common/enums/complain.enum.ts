@@ -9,12 +9,18 @@ export enum ComplaintCategory {
 }
 
 export enum ComplaintStatus {
-  OPEN = 'open',
+  RECEIVED = 'received',
+  ASSIGNED = 'assigned',
   IN_PROGRESS = 'in_progress',
+  ON_HOLD = 'on_hold',
+  AWAITING_CUSTOMER = 'awaiting_customer',
   RESOLVED = 'resolved',
-  AWAITING_FEEDBACK = 'awaiting_feedback',
   CLOSED = 'closed',
-  REOPENED = 'reopened',
+  REJECTED = 'rejected',
+  // Legacy statuses for backward compatibility
+  OPEN = 'open', // Maps to RECEIVED
+  AWAITING_FEEDBACK = 'awaiting_feedback', // Maps to AWAITING_CUSTOMER
+  REOPENED = 'reopened', // Maps to RECEIVED
 }
 
 export enum PriorityLevel {

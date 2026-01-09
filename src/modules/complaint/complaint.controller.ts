@@ -13,6 +13,7 @@ import {
   DefaultValuePipe,
   ParseIntPipe,
   ParseArrayPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -107,20 +108,31 @@ export class ComplaintController {
 
   /**
    * Update complaint status with validation and timeline tracking
+   * Employees (USER role) can update status of complaints assigned to them
    */
   @Put(':id/status')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
   async updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateStatusDto: complaintInterface.UpdateComplaintStatusDto,
     @Request() req,
   ): Promise<complaintInterface.ComplaintResponseDto> {
-    return this.complaintService.updateStatus(
-      id,
-      updateStatusDto,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      req.user.userId,
-    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const userId = req.user.userId;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const userRole = req.user.role;
+
+    // Check if USER role is trying to update status - verify they're assigned to the complaint
+    if (userRole === UserRole.USER) {
+      const complaint = await this.complaintService.findOne(id);
+      if (complaint.assignedTo?.id !== userId) {
+        throw new BadRequestException(
+          'You can only update status of complaints assigned to you',
+        );
+      }
+    }
+
+    return this.complaintService.updateStatus(id, updateStatusDto, userId);
   }
 
   @Post(':id/notes')

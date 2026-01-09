@@ -14,17 +14,23 @@ async function bootstrap() {
   });
 
   console.log('main.ts ');
+  // Get allowed origins from environment or use defaults
+  const allowedOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
+    : [
+        'http://localhost:3000', // Your frontend URL
+        'http://localhost:4200', // Angular dev server
+        'http://localhost:3001', // React dev server
+        'http://localhost:3002',
+        'http://127.0.0.1:3004', // React dev server
+        'http://localhost:3004', // React dev server
+        'http://localhost:8080',
+        'http://127.0.0.1:3000', // Alternative localhost
+        'http://206.189.82.117:3003', // Production API URL
+      ];
+
   app.enableCors({
-    origin: [
-      'http://localhost:3000', // Your frontend URL
-      'http://localhost:4200', // Angular dev server
-      'http://localhost:3001', // React dev server
-      'http://localhost:3002',
-      'http://127.0.0.1:3004', // React dev server
-      'http://localhost:3004', // React dev server
-      'http://localhost:8080',
-      'http://127.0.0.1:3000', // Alternative localhost
-    ],
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
