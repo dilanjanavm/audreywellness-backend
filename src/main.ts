@@ -1,11 +1,11 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-// Load environment-specific .env file
-const env = process.env.NODE_ENV || 'development';
-
 // Load base .env file first (for shared defaults)
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+// Check NODE_ENV after loading .env (might be set in .env file)
+const env = process.env.NODE_ENV || 'development';
 
 // Load environment-specific file (overrides base .env)
 if (env === 'production') {
@@ -31,14 +31,23 @@ async function bootstrap() {
 
   console.log('main.ts ');
   
+  // Get current environment (check again after .env files are loaded)
+  const currentEnv = process.env.NODE_ENV || 'development';
+  console.log(`🔍 Current NODE_ENV: ${currentEnv}`);
+  
   // Get allowed origins from environment or use environment-specific defaults
   const getDefaultOrigins = () => {
-    if (env === 'production') {
-      return [
-        'http://206.189.82.117:8080', // Production Frontend URL
-        'http://206.189.82.117:3003', // Production Backend URL (if needed)
-      ];
+    // Always include production URLs for safety
+    const productionUrls = [
+      'http://206.189.82.117:8080', // Production Frontend URL
+      'http://206.189.82.117:3003', // Production Backend URL (if needed)
+    ];
+    
+    if (currentEnv === 'production') {
+      return productionUrls;
     }
+    
+    // Development: include both localhost and production URLs
     return [
       'http://localhost:3000', // Your frontend URL
       'http://localhost:4200', // Angular dev server
@@ -48,6 +57,7 @@ async function bootstrap() {
       'http://localhost:3004', // React dev server
       'http://localhost:8080', // Local frontend
       'http://127.0.0.1:3000', // Alternative localhost
+      ...productionUrls, // Also include production URLs in development
     ];
   };
 
