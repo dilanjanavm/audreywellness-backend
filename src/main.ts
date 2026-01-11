@@ -1,6 +1,22 @@
 import * as dotenv from 'dotenv';
+import * as path from 'path';
 
-dotenv.config();
+// Load environment-specific .env file
+const env = process.env.NODE_ENV || 'development';
+
+// Load base .env file first (for shared defaults)
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+// Load environment-specific file (overrides base .env)
+if (env === 'production') {
+  const envFile = '.env.production';
+  dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+  console.log(`🔧 Environment: ${env}`);
+  console.log(`📄 Loaded environment files: .env, ${envFile}`);
+} else {
+  console.log(`🔧 Environment: ${env}`);
+  console.log(`📄 Loaded environment file: .env`);
+}
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -14,23 +30,51 @@ async function bootstrap() {
   });
 
   console.log('main.ts ');
-  // Get allowed origins from environment or use defaults
+  
+  // Get allowed origins from environment or use environment-specific defaults
+  const getDefaultOrigins = () => {
+    if (env === 'production') {
+      return [
+        'http://206.189.82.117:8080', // Production Frontend URL
+        'http://206.189.82.117:3003', // Production Backend URL (if needed)
+      ];
+    }
+    return [
+      'http://localhost:3000', // Your frontend URL
+      'http://localhost:4200', // Angular dev server
+      'http://localhost:3001', // React dev server
+      'http://localhost:3002',
+      'http://127.0.0.1:3004', // React dev server
+      'http://localhost:3004', // React dev server
+      'http://localhost:8080', // Local frontend
+      'http://127.0.0.1:3000', // Alternative localhost
+    ];
+  };
+
   const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
-    : [
-        'http://localhost:3000', // Your frontend URL
-        'http://localhost:4200', // Angular dev server
-        'http://localhost:3001', // React dev server
-        'http://localhost:3002',
-        'http://127.0.0.1:3004', // React dev server
-        'http://localhost:3004', // React dev server
-        'http://localhost:8080',
-        'http://127.0.0.1:3000', // Alternative localhost
-        'http://206.189.82.117:3003', // Production API URL
-      ];
+    : getDefaultOrigins();
+
+  console.log('🌐 CORS Allowed Origins:', allowedOrigins);
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Check if origin is in allowed list
+      if (allowedOrigins.includes(origin)) {
+        console.log(`✅ CORS: Allowing origin: ${origin}`);
+        return callback(null, true);
+      }
+
+      // Log blocked origins for debugging
+      console.warn(`❌ CORS: Blocked origin: ${origin}`);
+      console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
+      return callback(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
