@@ -382,37 +382,40 @@ export class CustomerService {
         const rowNumber = i + 2; // +2 because header is row 1 and arrays start at 0
 
         try {
-          // Skip empty rows
+          // Skip empty rows - check CSV columns directly
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          if (!row.name && !row.shortName && !row.smsPhone) {
+          const hasName = row.name && row.name.toString().trim() !== '';
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          const hasPhone = (row.phone || row.phone2) && (row.phone || row.phone2).toString().trim() !== '';
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          const hasRef = (row.debtor_ref || row.branch_ref) && (row.debtor_ref || row.branch_ref).toString().trim() !== '';
+          
+          if (!hasName && !hasPhone && !hasRef) {
             skipped++;
             continue;
           }
 
-          // Validate required fields
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          if (!row.name) {
+          // Validate and transform data first
+          const customerData = this.transformCsvRow(row, rowNumber);
+
+          // Validate required fields after transformation
+          if (!customerData.name || customerData.name.trim() === '') {
             errors.push(`Row ${rowNumber}: Name is required`);
             skipped++;
             continue;
           }
 
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          if (!row.shortName) {
-            errors.push(`Row ${rowNumber}: Short Name is required`);
+          if (!customerData.shortName || customerData.shortName.trim() === '') {
+            errors.push(`Row ${rowNumber}: Short Name (debtor_ref/branch_ref) is required`);
             skipped++;
             continue;
           }
 
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          if (!row.smsPhone) {
-            errors.push(`Row ${rowNumber}: SMS Phone is required`);
+          if (!customerData.smsPhone || customerData.smsPhone.trim() === '') {
+            errors.push(`Row ${rowNumber}: SMS Phone (phone/phone2) is required`);
             skipped++;
             continue;
           }
-
-          // Validate and transform data
-          const customerData = this.transformCsvRow(row, rowNumber);
 
           if (customerData) {
             // Check for duplicates based on shortName (mobile number) and smsPhone
@@ -488,34 +491,15 @@ export class CustomerService {
       const stream = Readable.from(fileBuffer.toString());
 
       const parser = parse({
-        columns: (header) =>
-          header.map((column) => {
-            // Map CSV headers to your entity fields
-            const columnMapping: { [key: string]: string } = {
-              'S.No': 'sNo',
-              Name: 'name',
-              'Short Name': 'shortName',
-              'Branch Name': 'branchName',
-              'City/Area': 'cityArea',
-              Email: 'email',
-              'SMS Phone': 'smsPhone',
-              Currency: 'currency',
-              'Sales Type': 'salesType',
-              'Payment Terms': 'paymentTerms',
-              DOB: 'dob',
-              Address: 'address',
-              Status: 'status',
-              'Sales Group': 'salesGroup',
-            };
-
-            return columnMapping[column] || column;
-          }),
+        columns: true, // Use first line as column names
         delimiter: ',',
         trim: true,
         skip_empty_lines: true,
         relax_quotes: true,
+        relax_column_count: true, // Allow rows with different column counts
         quote: '"',
         escape: '"',
+        skip_records_with_error: false, // Don't skip records, handle errors
       });
 
       stream
@@ -560,28 +544,48 @@ export class CustomerService {
     salesGroup: any;
     customerType: CustomerType;
   } {
-    console.log(rowNumber);
-    // Transform and validate the CSV row data
+    // Map CSV columns to entity fields
+    // CSV columns: type,debtor_no,branch_code,debtor_ref,branch_ref,address,tax_id,ntn_no,curr_abrev,terms,sales_type,credit_status,salesman_name,location_name,shipper_name,area,tax_group,group_no,notes,phone,phone2,fax,email,DOB,name,...
+    
+    // Extract and map fields from CSV structure
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const sNo = (row.debtor_no || row.branch_code || '').toString().trim();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const name = (row.name || '').toString().trim();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const shortName = (row.debtor_ref || row.branch_ref || row.name || '').toString().trim().substring(0, 50);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const branchName = (row.location_name || row.shipper_name || '').toString().trim();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const cityArea = (row.area || '').toString().trim();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const email = (row.email || '').toString().trim() || null;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const smsPhone = (row.phone || row.phone2 || '').toString().trim();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const currency = (row.curr_abrev || 'LKR').toString().trim();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const address = (row.address || '').toString().trim() || null;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const salesGroup = (row.group_no || 'General').toString().trim();
 
     // Handle date format (0000-00-00 should be null)
     let dob: Date | null = null;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (row.dob && row.dob !== '0000-00-00') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      const dobDate = new Date(row.dob);
-      if (isNaN(dobDate.getTime())) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        throw new Error(`Invalid date format for DOB: ${row.dob}`);
+    const dobValue = (row.DOB || row.dob || '').toString().trim();
+    if (dobValue && dobValue !== '0000-00-00' && dobValue !== '') {
+      const dobDate = new Date(dobValue);
+      if (!isNaN(dobDate.getTime())) {
+        dob = dobDate;
       }
-      dob = dobDate;
     }
 
     // Validate and map sales type
     let salesType: SalesType = SalesType.RETAIL;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (row.salesType) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-      const salesTypeUpper = row.salesType.toUpperCase();
+    const salesTypeValue = (row.sales_type || row.salesType || '').toString().trim();
+    if (salesTypeValue) {
+      const salesTypeUpper = salesTypeValue.toUpperCase();
       if (salesTypeUpper in SalesType) {
         salesType = SalesType[salesTypeUpper as keyof typeof SalesType];
       }
@@ -590,69 +594,48 @@ export class CustomerService {
     // Validate and map payment terms
     let paymentTerms: PaymentTerms = PaymentTerms.COD_IML;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (row.paymentTerms) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-      const paymentTermsUpper = row.paymentTerms
-        .toUpperCase()
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        .replace(' ', '_');
-      if (paymentTermsUpper in PaymentTerms) {
-        paymentTerms =
-          PaymentTerms[paymentTermsUpper as keyof typeof PaymentTerms];
+    const termsValue = (row.terms || row.paymentTerms || '').toString().trim();
+    if (termsValue) {
+      // Map common payment terms formats (e.g., "COD-IML", "15 Days", "30 Days")
+      if (termsValue.toUpperCase().includes('COD')) {
+        paymentTerms = PaymentTerms.COD_IML;
+      } else if (termsValue.includes('15') || termsValue.toLowerCase().includes('fifteen')) {
+        paymentTerms = PaymentTerms.FIFTEEN_DAYS;
+      } else if (termsValue.includes('30') || termsValue.toLowerCase().includes('thirty')) {
+        paymentTerms = PaymentTerms.THIRTY_DAYS;
+      } else if (termsValue.includes('45') || termsValue.toLowerCase().includes('forty')) {
+        paymentTerms = PaymentTerms.FORTY_FIVE_DAYS;
+      } else if (termsValue.includes('60') || termsValue.toLowerCase().includes('sixty')) {
+        paymentTerms = PaymentTerms.SIXTY_DAYS;
       }
     }
 
-    // Validate and map status
-    let status: Status = Status.ACTIVE;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (row.status) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-      const statusUpper = row.status.toUpperCase();
-      if (statusUpper in Status) {
-        status = Status[statusUpper as keyof typeof Status];
-      }
-    }
+    // Status is always ACTIVE for imported customers
+    const status: Status = Status.ACTIVE;
 
     // Validate email format if provided
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-    if (row.email && row.email.trim() !== '') {
+    if (email && email !== '') {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      if (!emailRegex.test(row.email)) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        throw new Error(`Invalid email format: ${row.email}`);
+      if (!emailRegex.test(email)) {
+        throw new Error(`Invalid email format: ${email}`);
       }
     }
 
     return {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call
-      sNo: row.sNo?.toString() || '',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call
-      name: row.name?.toString() || '',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call
-      shortName: row.shortName?.toString() || '',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call
-      branchName: row.branchName?.toString() || '',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call
-      cityArea: row.cityArea?.toString() || '',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call
-      email: row.email?.toString() || null,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call
-      smsPhone: row.smsPhone?.toString() || '',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call
-      currency: row.currency?.toString() || 'LKR',
-
+      sNo: sNo || '',
+      name: name || '',
+      shortName: shortName || '',
+      branchName: branchName || 'Main Branch',
+      cityArea: cityArea || 'Unknown',
+      email: email || null,
+      smsPhone: smsPhone || '',
+      currency: currency || 'LKR',
       salesType,
-
       paymentTerms,
       dob,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call
-      address: row.address?.toString() || null,
-
+      address: address || null,
       status,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-unsafe-call
-      salesGroup: row.salesGroup?.toString() || '',
-
+      salesGroup: salesGroup || 'General',
       customerType: CustomerType.INDIVIDUAL, // Default value
     };
   }
