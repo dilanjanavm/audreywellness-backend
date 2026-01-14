@@ -44,10 +44,45 @@ export class TransformInterceptor<T>
         }
 
         // If data has a 'data' property, extract it (controller already wrapped it)
+        // But preserve pagination metadata if present
         if (typeof data === 'object' && 'data' in data) {
+          const dataObj = data as any;
+          const paginationFields = [
+            'total',
+            'page',
+            'limit',
+            'totalPages',
+            'pageCount',
+            'perPageRows',
+            'hasNextPage',
+            'hasPrevPage',
+            'pagination',
+          ];
+
+          // Check if this looks like a paginated response
+          const hasPaginationMetadata =
+            paginationFields.some((field) => field in dataObj);
+
+          if (hasPaginationMetadata) {
+            // Preserve pagination metadata along with data
+            const result: any = {
+              statusCode,
+              data: dataObj.data,
+            };
+
+            // Copy all pagination-related fields
+            paginationFields.forEach((field) => {
+              if (field in dataObj) {
+                result[field] = dataObj[field];
+              }
+            });
+
+            return result;
+          }
+
           return {
             statusCode,
-            data: (data as any).data,
+            data: dataObj.data,
           };
         }
 

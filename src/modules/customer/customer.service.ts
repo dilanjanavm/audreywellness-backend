@@ -129,6 +129,10 @@ export class CustomerService {
     page: number;
     limit: number;
     totalPages: number;
+    pageCount: number;
+    perPageRows: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
   }> {
     const {
       searchTerm,
@@ -213,8 +217,10 @@ export class CustomerService {
       .take(validLimit)
       .getMany();
 
-    // Calculate total pages
+    // Calculate pagination details
     const totalPages = Math.ceil(total / validLimit);
+    const hasNextPage = validPage < totalPages;
+    const hasPrevPage = validPage > 1;
 
     return {
       data: customers.map((customer) => this.mapToResponseDto(customer)),
@@ -222,6 +228,10 @@ export class CustomerService {
       page: validPage,
       limit: validLimit,
       totalPages,
+      pageCount: totalPages, // Alias for totalPages (common frontend naming)
+      perPageRows: validLimit, // Alias for limit (common frontend naming)
+      hasNextPage,
+      hasPrevPage,
     };
   }
 

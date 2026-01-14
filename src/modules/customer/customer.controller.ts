@@ -90,6 +90,10 @@ export class CustomerController {
     page: number;
     limit: number;
     totalPages: number;
+    pageCount: number;
+    perPageRows: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
   }> {
     // Validate pagination parameters
     const validPage = Math.max(1, page);
