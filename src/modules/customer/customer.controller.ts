@@ -15,7 +15,10 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Res,
+  HttpStatus,
 } from '@nestjs/common';
+import express from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -165,5 +168,57 @@ export class CustomerController {
     complaints: any[];
   }> {
     return this.customerService.findCustomerComplaints(id);
+  }
+
+  /**
+   * Export customers to CSV with optional filtering
+   * Supports filtering by City/Area and other filters
+   */
+  @Get('export/csv')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  async exportToCsv(
+    @Res() res: express.Response,
+    @Query('cityArea') cityArea?: string,
+    @Query('search') searchTerm?: string,
+    @Query('type') customerType?: CustomerType,
+    @Query('salesType') salesType?: SalesType,
+    @Query('status') status?: Status,
+    @Query('salesGroup') salesGroup?: string,
+    @Query('sNo') sNo?: string,
+  ): Promise<void> {
+    try {
+      const filters = {
+        cityArea,
+        searchTerm,
+        customerType,
+        salesType,
+        status,
+        salesGroup,
+        sNo,
+      };
+
+      const csvContent = await this.customerService.exportToCsv(filters);
+
+      // Generate filename with timestamp and filter info
+      const timestamp = new Date().toISOString().split('T')[0];
+      let filename = `customers_export_${timestamp}.csv`;
+      if (cityArea) {
+        const safeCityArea = cityArea.replace(/[^a-zA-Z0-9]/g, '_');
+        filename = `customers_export_${safeCityArea}_${timestamp}.csv`;
+      }
+
+      res.set({
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': Buffer.byteLength(csvContent, 'utf8').toString(),
+      });
+
+      res.status(HttpStatus.OK).send(csvContent);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(`Failed to export customers: ${error.message}`);
+    }
   }
 }

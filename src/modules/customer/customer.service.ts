@@ -823,6 +823,164 @@ export class CustomerService {
     return await this.customerRepository.save(updatedCustomer);
   }
 
+  /**
+   * Export customers to CSV with optional filtering
+   */
+  async exportToCsv(filters: {
+    cityArea?: string;
+    searchTerm?: string;
+    customerType?: CustomerType;
+    salesType?: SalesType;
+    status?: Status;
+    salesGroup?: string;
+    sNo?: string;
+  } = {}): Promise<string> {
+    const {
+      searchTerm,
+      customerType,
+      salesType,
+      status,
+      cityArea,
+      salesGroup,
+      sNo,
+    } = filters;
+
+    // Build query using QueryBuilder (similar to findAll but without pagination)
+    const queryBuilder = this.customerRepository.createQueryBuilder('customer');
+
+    // Apply searchTerm filter - search across multiple fields
+    if (searchTerm) {
+      queryBuilder.andWhere(
+        `(
+          LOWER(customer.name) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.sNo) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.shortName) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.email) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.smsPhone) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.branchName) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.cityArea) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.salesGroup) LIKE LOWER(:searchTerm) OR
+          LOWER(customer.address) LIKE LOWER(:searchTerm)
+        )`,
+        { searchTerm: `%${searchTerm}%` },
+      );
+    }
+
+    // Apply sNo filter
+    if (sNo) {
+      queryBuilder.andWhere('LOWER(customer.sNo) LIKE LOWER(:sNo)', {
+        sNo: `%${sNo}%`,
+      });
+    }
+
+    // Apply cityArea filter (primary filter for export)
+    if (cityArea) {
+      queryBuilder.andWhere('LOWER(customer.cityArea) LIKE LOWER(:cityArea)', {
+        cityArea: `%${cityArea}%`,
+      });
+    }
+
+    // Apply other filters
+    if (customerType) {
+      queryBuilder.andWhere('customer.customerType = :customerType', {
+        customerType,
+      });
+    }
+
+    if (salesType) {
+      queryBuilder.andWhere('customer.salesType = :salesType', { salesType });
+    }
+
+    if (status) {
+      queryBuilder.andWhere('customer.status = :status', { status });
+    }
+
+    if (salesGroup) {
+      queryBuilder.andWhere('LOWER(customer.salesGroup) LIKE LOWER(:salesGroup)', {
+        salesGroup: `%${salesGroup}%`,
+      });
+    }
+
+    // Get all customers matching the filters (no pagination for export)
+    const customers = await queryBuilder
+      .orderBy('customer.createdAt', 'DESC')
+      .getMany();
+
+    if (customers.length === 0) {
+      throw new NotFoundException('No customers found to export');
+    }
+
+    // Define CSV headers (matching import format)
+    const headers = [
+      'S_No',
+      'Name',
+      'Short Name',
+      'Branch Name',
+      'City/Area',
+      'Email',
+      'SMS Phone',
+      'Currency',
+      'Sales Type',
+      'Payment Terms',
+      'Date of Birth',
+      'Address',
+      'Status',
+      'Sales Group',
+      'Customer Type',
+      'Created At',
+      'Updated At',
+    ];
+
+    // Build CSV content
+    let csvContent = headers.join(',') + '\n';
+
+    customers.forEach((customer) => {
+      const escapeCSV = (value: any): string => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        // If value contains comma, quote, or newline, wrap in quotes and escape quotes
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const formatDate = (date: Date | null | undefined): string => {
+        if (!date) return '';
+        const d = new Date(date);
+        return d.toISOString().split('T')[0]; // YYYY-MM-DD format
+      };
+
+      const row = [
+        escapeCSV(customer.sNo),
+        escapeCSV(customer.name),
+        escapeCSV(customer.shortName),
+        escapeCSV(customer.branchName),
+        escapeCSV(customer.cityArea),
+        escapeCSV(customer.email),
+        escapeCSV(customer.smsPhone),
+        escapeCSV(customer.currency),
+        escapeCSV(customer.salesType),
+        escapeCSV(customer.paymentTerms),
+        escapeCSV(customer.dob ? formatDate(customer.dob) : ''),
+        escapeCSV(customer.address),
+        escapeCSV(customer.status),
+        escapeCSV(customer.salesGroup),
+        escapeCSV(customer.customerType),
+        escapeCSV(customer.createdAt ? formatDate(customer.createdAt) : ''),
+        escapeCSV(customer.updatedAt ? formatDate(customer.updatedAt) : ''),
+      ];
+
+      csvContent += row.join(',') + '\n';
+    });
+
+    this.logger.log(
+      `Exported ${customers.length} customers to CSV${cityArea ? ` (filtered by City/Area: ${cityArea})` : ''}`,
+    );
+
+    return csvContent;
+  }
+
   private mapToResponseDto(customer: CustomerEntity): CustomerResponseDto {
     return {
       id: customer.id,
