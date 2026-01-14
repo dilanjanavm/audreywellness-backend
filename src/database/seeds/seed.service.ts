@@ -262,7 +262,7 @@ export class SeedService {
   }
 
   /**
-   * Create initial task phases (R&D, Blending, Filling & Packing)
+   * Create initial task phases (R&D, Blending, Filling & Packing, Dispatch)
    */
   private async createInitialPhases(): Promise<void> {
     this.logger.log('Creating initial task phases...');
@@ -299,6 +299,19 @@ export class SeedService {
         description: 'Filling and Packing phase',
         color: '#FF6B6B', // Red/Orange
         order: 3,
+        statuses: [
+          TaskStatus.PENDING,
+          TaskStatus.ONGOING,
+          TaskStatus.REVIEW,
+          TaskStatus.COMPLETED,
+          TaskStatus.FAILED,
+        ],
+      },
+      {
+        name: 'Dispatch',
+        description: 'Dispatch phase',
+        color: '#9B59B6', // Purple
+        order: 4,
         statuses: [
           TaskStatus.PENDING,
           TaskStatus.ONGOING,
