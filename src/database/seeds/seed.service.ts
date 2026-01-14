@@ -6,7 +6,9 @@ import { User } from '../../modules/users/user.entity';
 import { Role } from '../../modules/roles/entities/role.entity';
 import { Permission } from '../../modules/permissions/entities/permission.entity';
 import { RolePermission } from '../../modules/role-permissions/entities/role-permission.entity';
+import { TaskPhaseEntity } from '../../modules/tasks/entities/task-phase.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { TaskStatus } from '../../common/enums/task.enum';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -22,6 +24,8 @@ export class SeedService {
     private readonly permissionRepository: Repository<Permission>,
     @InjectRepository(RolePermission)
     private readonly rolePermissionRepository: Repository<RolePermission>,
+    @InjectRepository(TaskPhaseEntity)
+    private readonly phaseRepository: Repository<TaskPhaseEntity>,
   ) {}
 
   async run() {
@@ -35,6 +39,9 @@ export class SeedService {
 
     // 3. Create Super Admin user
     await this.createSuperAdminUser(superAdminRole);
+
+    // 4. Create initial task phases
+    await this.createInitialPhases();
 
     this.logger.log('✅ Database seeding completed successfully!');
   }
@@ -252,5 +259,82 @@ export class SeedService {
         throw error;
       }
     }
+  }
+
+  /**
+   * Create initial task phases (R&D, Blending, Filling & Packing)
+   */
+  private async createInitialPhases(): Promise<void> {
+    this.logger.log('Creating initial task phases...');
+
+    const phaseDefinitions = [
+      {
+        name: 'R&D',
+        description: 'Research and Development phase',
+        color: '#4A90E2', // Blue
+        order: 1,
+        statuses: [
+          TaskStatus.PENDING,
+          TaskStatus.ONGOING,
+          TaskStatus.REVIEW,
+          TaskStatus.COMPLETED,
+          TaskStatus.FAILED,
+        ],
+      },
+      {
+        name: 'Blending',
+        description: 'Blending phase',
+        color: '#50C878', // Green
+        order: 2,
+        statuses: [
+          TaskStatus.PENDING,
+          TaskStatus.ONGOING,
+          TaskStatus.REVIEW,
+          TaskStatus.COMPLETED,
+          TaskStatus.FAILED,
+        ],
+      },
+      {
+        name: 'Filling & Packing',
+        description: 'Filling and Packing phase',
+        color: '#FF6B6B', // Red/Orange
+        order: 3,
+        statuses: [
+          TaskStatus.PENDING,
+          TaskStatus.ONGOING,
+          TaskStatus.REVIEW,
+          TaskStatus.COMPLETED,
+          TaskStatus.FAILED,
+        ],
+      },
+    ];
+
+    for (const phaseDef of phaseDefinitions) {
+      let phase = await this.phaseRepository.findOne({
+        where: { name: phaseDef.name },
+      });
+
+      if (!phase) {
+        phase = this.phaseRepository.create({
+          name: phaseDef.name,
+          description: phaseDef.description,
+          color: phaseDef.color,
+          order: phaseDef.order,
+          statuses: phaseDef.statuses,
+        });
+        phase = await this.phaseRepository.save(phase);
+        this.logger.log(`✅ Created phase: ${phaseDef.name}`);
+      } else {
+        // Update existing phase to ensure it has correct order and statuses
+        phase.order = phaseDef.order;
+        phase.color = phaseDef.color;
+        phase.description = phaseDef.description;
+        phase.statuses = phaseDef.statuses;
+        phase = await this.phaseRepository.save(phase);
+        this.logger.log(`⚠️  Phase already exists, updated: ${phaseDef.name}`);
+      }
+    }
+
+    this.logger.log('✅ Initial task phases created/verified successfully');
   }
 }

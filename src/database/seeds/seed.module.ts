@@ -7,6 +7,7 @@ import { User } from '../../modules/users/user.entity';
 import { Role } from '../../modules/roles/entities/role.entity';
 import { Permission } from '../../modules/permissions/entities/permission.entity';
 import { RolePermission } from '../../modules/role-permissions/entities/role-permission.entity';
+import { TaskPhaseEntity } from '../../modules/tasks/entities/task-phase.entity';
 import databaseConfig from '../../config/database.config';
 
 @Module({
@@ -26,7 +27,7 @@ import databaseConfig from '../../config/database.config';
       },
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([User, Role, Permission, RolePermission]),
+    TypeOrmModule.forFeature([User, Role, Permission, RolePermission, TaskPhaseEntity]),
   ],
   providers: [SeedService],
   exports: [SeedService],
