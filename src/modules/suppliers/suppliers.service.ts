@@ -146,12 +146,18 @@ export class SuppliersService {
     isActive?: boolean,
     includeItems: boolean = false,
   ): Promise<{ data: Supplier[]; total: number; page: number; limit: number }> {
-    const skip = (page - 1) * limit;
+    // Validate pagination parameters
+    const validPage = Math.max(1, page);
+    const validLimit = Math.min(Math.max(1, limit), 100); // Min 1, Max 100
+    const skip = (validPage - 1) * validLimit;
 
     // Create query builder
-    const queryBuilder = this.supplierRepository
-      .createQueryBuilder('supplier')
-      .leftJoinAndSelect('supplier.items', 'items');
+    const queryBuilder = this.supplierRepository.createQueryBuilder('supplier');
+
+    // Conditionally join items only if includeItems is true
+    if (includeItems) {
+      queryBuilder.leftJoinAndSelect('supplier.items', 'items');
+    }
 
     // Apply isActive filter
     if (isActive !== undefined) {
@@ -163,33 +169,35 @@ export class SuppliersService {
       });
     }
 
-    // Apply search filter
+    // Apply search filter - using LOWER() for case-insensitive search (MySQL compatible)
     if (search) {
       queryBuilder.andWhere(
-        `(supplier.name ILIKE :search OR 
-          supplier.reference ILIKE :search OR 
-          supplier.phone ILIKE :search OR
-          supplier.contactPerson ILIKE :search OR
-          supplier.email ILIKE :search)`,
+        `(
+          LOWER(supplier.name) LIKE LOWER(:search) OR 
+          LOWER(supplier.reference) LIKE LOWER(:search) OR 
+          LOWER(supplier.phone) LIKE LOWER(:search) OR
+          LOWER(supplier.contactPerson) LIKE LOWER(:search) OR
+          LOWER(supplier.email) LIKE LOWER(:search)
+        )`,
         { search: `%${search}%` },
       );
     }
 
-    // Get total count for pagination
+    // Get total count for pagination (before applying skip/take)
     const total = await queryBuilder.getCount();
 
     // Apply pagination and ordering
     const data = await queryBuilder
       .orderBy('supplier.name', 'ASC')
       .skip(skip)
-      .take(limit)
+      .take(validLimit)
       .getMany();
 
     return {
       data,
       total,
-      page,
-      limit,
+      page: validPage,
+      limit: validLimit,
     };
   }
 

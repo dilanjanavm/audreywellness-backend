@@ -49,11 +49,17 @@ export class SuppliersController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
   async findAll(
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number = 10,
     @Query('search') search?: string,
-    @Query('active') active?: boolean,
-    @Query('includeItems') includeItems?: boolean,
+    @Query('active', new DefaultValuePipe(undefined), ParseBoolPipe)
+    active?: boolean,
+    @Query(
+      'includeItems',
+      new DefaultValuePipe(false),
+      ParseBoolPipe,
+    )
+    includeItems?: boolean,
   ) {
     return this.suppliersService.findAll(
       page,
