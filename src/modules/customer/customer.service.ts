@@ -128,6 +128,7 @@ export class CustomerService {
     total: number;
     page: number;
     limit: number;
+    totalPages: number;
   }> {
     const {
       searchTerm,
@@ -141,50 +142,86 @@ export class CustomerService {
       limit = 10,
     } = filters;
 
-    const skip = (page - 1) * limit;
+    // Validate pagination parameters
+    const validPage = Math.max(1, page);
+    const validLimit = Math.min(Math.max(1, limit), 100); // Min 1, Max 100
+    const skip = (validPage - 1) * validLimit;
 
-    const where: FindOptionsWhere<CustomerEntity> = {};
+    // Build query using QueryBuilder for better search across multiple fields
+    const queryBuilder = this.customerRepository.createQueryBuilder('customer');
 
+    // Apply searchTerm filter - search across multiple fields
+    // Using LOWER() for case-insensitive search (MySQL compatible)
     if (searchTerm) {
-      where.name = ILike(`%${searchTerm}%`);
+      queryBuilder.andWhere(
+        `(
+          LOWER(customer.name) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.sNo) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.shortName) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.email) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.smsPhone) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.branchName) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.cityArea) LIKE LOWER(:searchTerm) OR 
+          LOWER(customer.salesGroup) LIKE LOWER(:searchTerm) OR
+          LOWER(customer.address) LIKE LOWER(:searchTerm)
+        )`,
+        { searchTerm: `%${searchTerm}%` },
+      );
     }
 
+    // Apply sNo filter (if provided separately, can be used with or without searchTerm)
     if (sNo) {
-      where.sNo = ILike(`%${sNo}%`);
+      queryBuilder.andWhere('LOWER(customer.sNo) LIKE LOWER(:sNo)', {
+        sNo: `%${sNo}%`,
+      });
     }
 
+    // Apply other filters
     if (customerType) {
-      where.customerType = customerType;
+      queryBuilder.andWhere('customer.customerType = :customerType', {
+        customerType,
+      });
     }
 
     if (salesType) {
-      where.salesType = salesType;
+      queryBuilder.andWhere('customer.salesType = :salesType', { salesType });
     }
 
     if (status) {
-      where.status = status;
+      queryBuilder.andWhere('customer.status = :status', { status });
     }
 
     if (cityArea) {
-      where.cityArea = ILike(`%${cityArea}%`);
+      queryBuilder.andWhere('LOWER(customer.cityArea) LIKE LOWER(:cityArea)', {
+        cityArea: `%${cityArea}%`,
+      });
     }
 
     if (salesGroup) {
-      where.salesGroup = ILike(`%${salesGroup}%`);
+      queryBuilder.andWhere('LOWER(customer.salesGroup) LIKE LOWER(:salesGroup)', {
+        salesGroup: `%${salesGroup}%`,
+      });
     }
 
-    const [customers, total] = await this.customerRepository.findAndCount({
-      where,
-      order: { createdAt: 'DESC' },
-      skip,
-      take: limit,
-    });
+    // Get total count before pagination
+    const total = await queryBuilder.getCount();
+
+    // Apply pagination and ordering
+    const customers = await queryBuilder
+      .orderBy('customer.createdAt', 'DESC')
+      .skip(skip)
+      .take(validLimit)
+      .getMany();
+
+    // Calculate total pages
+    const totalPages = Math.ceil(total / validLimit);
 
     return {
       data: customers.map((customer) => this.mapToResponseDto(customer)),
       total,
-      page,
-      limit,
+      page: validPage,
+      limit: validLimit,
+      totalPages,
     };
   }
 

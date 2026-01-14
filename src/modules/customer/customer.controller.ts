@@ -89,19 +89,22 @@ export class CustomerController {
     total: number;
     page: number;
     limit: number;
+    totalPages: number;
   }> {
+    // Validate pagination parameters
+    const validPage = Math.max(1, page);
+    const validLimit = Math.min(Math.max(1, limit), 100); // Min 1, Max 100
+
     const filters: customerInterface.CustomerSearchFilters = {
       searchTerm,
       customerType,
-
       salesType,
-
       status,
       cityArea,
       salesGroup,
       sNo, // Added sNo to filters
-      page,
-      limit: limit > 100 ? 100 : limit,
+      page: validPage,
+      limit: validLimit,
     };
 
     return this.customerService.findAll(filters);
