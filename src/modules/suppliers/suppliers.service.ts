@@ -10,9 +10,10 @@ import { Repository, In } from 'typeorm';
 import { Supplier } from './entities/supplier.entity';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
-import csv from 'csv-parser';
-import * as stream from 'stream';
+import { parse } from 'csv-parse';
+import { Readable } from 'stream';
 import { ItemEntity } from '../item/entities/item.entity';
+import { Logger } from '@nestjs/common';
 
 export interface ImportResult {
   total: number;
@@ -29,6 +30,8 @@ export interface SupplierStats {
 
 @Injectable()
 export class SuppliersService {
+  private readonly logger = new Logger(SuppliersService.name);
+
   constructor(
     @InjectRepository(Supplier)
     private readonly supplierRepository: Repository<Supplier>,
@@ -389,113 +392,184 @@ export class SuppliersService {
 
   // Import suppliers from CSV
   async importFromCsv(fileBuffer: Buffer): Promise<ImportResult> {
-    const results: any[] = [];
     const errors: string[] = [];
+    let successful = 0;
+    let failed = 0;
 
-    return new Promise((resolve, reject) => {
-      const readableStream = new stream.PassThrough();
-      readableStream.end(fileBuffer);
+    try {
+      // Parse CSV file using csv-parse (handles varying column counts better)
+      const csvData = await this.parseCsv(fileBuffer);
 
-      readableStream
+      this.logger.log(`Parsed ${csvData.length} rows from CSV file`);
 
-        .pipe(csv())
+      // Process each record
+      for (let i = 0; i < csvData.length; i++) {
+        const row = csvData[i];
+        const rowNumber = i + 2; // +2 because header is row 1 and arrays start at 0
 
-        .on('data', (data) => results.push(data))
-
-        .on('end', async () => {
-          let successful = 0;
-          let failed = 0;
-
-          for (const [index, row] of results.entries()) {
-            try {
-              // Skip if not a SUPPLIER type
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-              if (row.type !== 'SUPPLIER') {
-                continue;
-              }
-
-              // Map CSV columns to our entity fields
-              const supplierData = {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-                name: row.supp_name?.trim() || `Supplier ${index + 1}`,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-                reference: row.supp_ref?.trim() || `REF-${index + 1}`,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-                address: this.cleanAddress(row.address || row.supp_address),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-                phone: this.cleanPhone(row.phone || row.phone2),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-                contactPerson: row.contact_person?.trim(),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-                email: row.email?.trim(),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-                phone2: this.cleanPhone(row.phone2),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-                fax: row.fax?.trim(),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-                ntnNumber: row.ntn_no?.trim(),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-                gstNumber: row.gst_no?.trim(),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-                paymentTerms: row.terms?.trim(),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-                taxGroup: row.tax_group?.trim(),
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-                currency: row.curr_abrev?.trim() || 'LKR',
-              };
-
-              // Validate required fields
-              if (
-                !supplierData.name ||
-                !supplierData.reference ||
-                !supplierData.address
-              ) {
-                throw new Error(
-                  'Missing required fields: name, reference, or address',
-                );
-              }
-
-              // Check if supplier already exists by reference
-              const existing = await this.supplierRepository.findOne({
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                where: { reference: supplierData.reference },
-              });
-
-              if (existing) {
-                // Update existing supplier
-                await this.supplierRepository.update(existing.id, supplierData);
-              } else {
-                // Create new supplier
-                const supplierCode = await this.generateSupplierCode();
-                const supplier = this.supplierRepository.create({
-                  ...supplierData,
-                  supplierCode,
-                });
-                await this.supplierRepository.save(supplier);
-              }
-
-              successful++;
-            } catch (error) {
-              failed++;
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-              errors.push(`Row ${index + 2}: ${error.message}`);
-            }
+        try {
+          // Skip if not a SUPPLIER type
+          if (!row.type || row.type.toString().trim().toUpperCase() !== 'SUPPLIER') {
+            continue;
           }
 
-          resolve({
-            total: results.length,
-            successful,
-            failed,
-            errors,
-          });
-        })
+          // Skip empty rows
+          const hasName = row.supp_name && row.supp_name.toString().trim() !== '';
+          const hasRef = row.supp_ref && row.supp_ref.toString().trim() !== '';
+          if (!hasName && !hasRef) {
+            continue;
+          }
 
-        .on('error', (error) => {
-          reject(
-            new BadRequestException(`CSV parsing error: ${error.message}`),
-          );
-        });
+          // Transform CSV row to supplier data
+          const supplierData = this.transformCsvRow(row);
+
+          // Validate required fields
+          if (!supplierData.name || supplierData.name.trim() === '') {
+            errors.push(`Row ${rowNumber}: Name (supp_name) is required`);
+            failed++;
+            continue;
+          }
+
+          if (!supplierData.reference || supplierData.reference.trim() === '') {
+            errors.push(`Row ${rowNumber}: Reference (supp_ref) is required`);
+            failed++;
+            continue;
+          }
+
+          // Check if supplier already exists by reference
+          const existing = await this.supplierRepository.findOne({
+            where: { reference: supplierData.reference },
+          });
+
+          if (existing) {
+            // Update existing supplier
+            await this.supplierRepository.update(existing.id, {
+              ...supplierData,
+              isActive: supplierData.isActive ?? existing.isActive,
+            });
+            successful++;
+            this.logger.log(
+              `Updated supplier: ${existing.id} (${supplierData.name})`,
+            );
+          } else {
+            // Create new supplier
+            const supplierCode = await this.generateSupplierCode();
+            const supplier = this.supplierRepository.create({
+              ...supplierData,
+              supplierCode,
+              isActive: supplierData.isActive ?? true,
+            });
+            await this.supplierRepository.save(supplier);
+            successful++;
+            this.logger.log(`Created new supplier: ${supplierCode} (${supplierData.name})`);
+          }
+        } catch (error) {
+          failed++;
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          errors.push(`Row ${rowNumber}: ${errorMessage}`);
+          this.logger.error(`Error processing row ${rowNumber}:`, errorMessage);
+        }
+      }
+
+      this.logger.log(
+        `CSV import completed: ${successful} successful, ${failed} failed`,
+      );
+
+      return {
+        total: csvData.length,
+        successful,
+        failed,
+        errors,
+      };
+    } catch (error) {
+      this.logger.error('CSV import failed:', error);
+      throw new BadRequestException(
+        `CSV parsing error: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Parse CSV file buffer into records
+   */
+  private async parseCsv(fileBuffer: Buffer): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      const records: any[] = [];
+
+      const stream = Readable.from(fileBuffer.toString());
+
+      const parser = parse({
+        columns: true, // Use first line as column names
+        delimiter: ',',
+        trim: true,
+        skip_empty_lines: true,
+        relax_quotes: true,
+        relax_column_count: true, // Allow rows with different column counts
+        quote: '"',
+        escape: '"',
+        skip_records_with_error: false, // Don't skip records, handle errors
+      });
+
+      stream
+        .pipe(parser)
+        .on('data', (record) => {
+          // Skip completely empty rows
+          if (
+            Object.values(record).some(
+              (value) => value && value.toString().trim() !== '',
+            )
+          ) {
+            records.push(record);
+          }
+        })
+        .on('end', () => resolve(records))
+        .on('error', (error) => reject(error));
     });
+  }
+
+  /**
+   * Transform CSV row to supplier data
+   */
+  private transformCsvRow(row: any): {
+    name: string;
+    reference: string;
+    address: string;
+    phone: string;
+    phone2?: string;
+    fax?: string;
+    email?: string;
+    contactPerson?: string;
+    ntnNumber?: string;
+    gstNumber?: string;
+    paymentTerms?: string;
+    taxGroup?: string;
+    currency: string;
+    isActive?: boolean;
+  } {
+    // Get address from either 'address' or 'supp_address' column
+    const address = row.address?.toString().trim() || row.supp_address?.toString().trim() || '';
+    
+    // Get phone from either 'phone' or 'phone2', prioritize phone
+    const phone = row.phone?.toString().trim() || row.phone2?.toString().trim() || '';
+    const phone2 = row.phone2?.toString().trim() || '';
+
+    return {
+      name: (row.supp_name?.toString().trim() || '').replace(/\s+/g, ' '), // Clean multiple spaces
+      reference: row.supp_ref?.toString().trim() || '',
+      address: address ? this.cleanAddress(address) : 'Address not provided',
+      phone: phone ? this.cleanPhone(phone) : 'Not Provided',
+      phone2: phone2 ? this.cleanPhone(phone2) : undefined,
+      fax: row.fax?.toString().trim() || undefined,
+      email: row.email?.toString().trim() || undefined,
+      contactPerson: row.contact_person?.toString().trim() || undefined,
+      ntnNumber: row.ntn_no?.toString().trim() || undefined,
+      gstNumber: row.gst_no?.toString().trim() || undefined,
+      paymentTerms: row.terms?.toString().trim() || undefined,
+      taxGroup: row.tax_group?.toString().trim() || undefined,
+      currency: (row.curr_abrev?.toString().trim() || 'LKR').toUpperCase(),
+      isActive: true, // Default to active
+    };
   }
 
   // Export suppliers to CSV
