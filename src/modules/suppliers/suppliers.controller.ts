@@ -13,6 +13,7 @@ import {
   Res,
   UseGuards,
   ParseUUIDPipe,
+  ParseIntPipe,
   BadRequestException,
   ParseBoolPipe,
   DefaultValuePipe,
