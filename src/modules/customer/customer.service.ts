@@ -571,6 +571,40 @@ export class CustomerService {
     });
   }
 
+  /**
+   * Helper function to replace empty string values with '#####'
+   */
+  private replaceEmptyString(value: string | null | undefined, defaultValue: string = '#####'): string {
+    if (!value || value.toString().trim() === '') {
+      return defaultValue;
+    }
+    return value.toString().trim();
+  }
+
+  /**
+   * Helper function to replace empty numeric values with '0'
+   */
+  private replaceEmptyNumber(value: string | number | null | undefined): string {
+    if (!value || value.toString().trim() === '') {
+      return '0';
+    }
+    return value.toString().trim();
+  }
+
+  /**
+   * Helper function to replace empty date values with '2000-01-01'
+   */
+  private replaceEmptyDate(value: string | null | undefined): Date | null {
+    if (!value || value.toString().trim() === '' || value.toString().trim() === '0000-00-00') {
+      return new Date('2000-01-01');
+    }
+    const dateValue = new Date(value.toString().trim());
+    if (isNaN(dateValue.getTime())) {
+      return new Date('2000-01-01');
+    }
+    return dateValue;
+  }
+
   private transformCsvRow(
     row: any,
     rowNumber: number,
@@ -594,38 +628,32 @@ export class CustomerService {
     // Map CSV columns to entity fields
     // CSV columns: type,debtor_no,branch_code,debtor_ref,branch_ref,address,tax_id,ntn_no,curr_abrev,terms,sales_type,credit_status,salesman_name,location_name,shipper_name,area,tax_group,group_no,notes,phone,phone2,fax,email,DOB,name,...
     
-    // Extract and map fields from CSV structure
+    // Extract and map fields from CSV structure with empty value replacement
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const sNo = (row.debtor_no || row.branch_code || '').toString().trim();
+    const sNo = this.replaceEmptyString(row.debtor_no || row.branch_code);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const name = (row.name || '').toString().trim();
+    const name = this.replaceEmptyString(row.name);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const shortName = (row.debtor_ref || row.branch_ref || row.name || '').toString().trim().substring(0, 50);
+    const shortName = this.replaceEmptyString(row.debtor_ref || row.branch_ref || row.name).substring(0, 50);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const branchName = (row.location_name || row.shipper_name || '').toString().trim();
+    const branchName = this.replaceEmptyString(row.location_name || row.shipper_name, '#####');
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const cityArea = (row.area || '').toString().trim();
+    const cityArea = this.replaceEmptyString(row.area);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const email = (row.email || '').toString().trim() || null;
+    const email = this.replaceEmptyString(row.email);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const smsPhone = (row.phone || row.phone2 || '').toString().trim();
+    const smsPhone = this.replaceEmptyString(row.phone || row.phone2);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const currency = (row.curr_abrev || 'LKR').toString().trim();
+    const currency = this.replaceEmptyString(row.curr_abrev, 'LKR');
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const address = (row.address || '').toString().trim() || null;
+    const address = this.replaceEmptyString(row.address);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const salesGroup = (row.group_no || 'General').toString().trim();
+    const salesGroup = this.replaceEmptyString(row.group_no, '#####');
 
-    // Handle date format (0000-00-00 should be null)
-    let dob: Date | null = null;
+    // Handle date format - replace empty dates with '2000-01-01'
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const dobValue = (row.DOB || row.dob || '').toString().trim();
-    if (dobValue && dobValue !== '0000-00-00' && dobValue !== '') {
-      const dobDate = new Date(dobValue);
-      if (!isNaN(dobDate.getTime())) {
-        dob = dobDate;
-      }
-    }
+    const dobValue = row.DOB || row.dob;
+    const dob: Date | null = this.replaceEmptyDate(dobValue);
 
     // Validate and map sales type
     let salesType: SalesType = SalesType.RETAIL;
@@ -660,8 +688,8 @@ export class CustomerService {
     // Status is always ACTIVE for imported customers
     const status: Status = Status.ACTIVE;
 
-    // Validate email format if provided
-    if (email && email !== '') {
+    // Validate email format if provided (skip validation for '#####' placeholder)
+    if (email && email !== '' && email !== '#####') {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         throw new Error(`Invalid email format: ${email}`);
@@ -669,20 +697,20 @@ export class CustomerService {
     }
 
     return {
-      sNo: sNo || '',
-      name: name || '',
-      shortName: shortName || '',
-      branchName: branchName || 'Main Branch',
-      cityArea: cityArea || 'Unknown',
-      email: email || null,
-      smsPhone: smsPhone || '',
+      sNo: sNo || '#####',
+      name: name || '#####',
+      shortName: shortName || '#####',
+      branchName: branchName || '#####',
+      cityArea: cityArea || '#####',
+      email: email === '#####' ? null : email, // Convert '#####' back to null for email (nullable field)
+      smsPhone: smsPhone || '#####',
       currency: currency || 'LKR',
       salesType,
       paymentTerms,
-      dob,
-      address: address || null,
+      dob: dob || new Date('2000-01-01'), // Replace empty dates with '2000-01-01'
+      address: address === '#####' ? null : address, // Convert '#####' back to null for address (nullable field)
       status,
-      salesGroup: salesGroup || 'General',
+      salesGroup: salesGroup || '#####',
       customerType: CustomerType.INDIVIDUAL, // Default value
     };
   }
