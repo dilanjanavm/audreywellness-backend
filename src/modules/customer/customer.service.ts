@@ -422,6 +422,11 @@ export class CustomerService {
       // Parse CSV file
       const csvData = await this.parseCsv(fileBuffer);
 
+      // Log column names from first row for debugging
+      if (csvData.length > 0) {
+        this.logger.debug('CSV Column names:', Object.keys(csvData[0]));
+      }
+
       // Validate and process each record
       for (let i = 0; i < csvData.length; i++) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -429,13 +434,10 @@ export class CustomerService {
         const rowNumber = i + 2; // +2 because header is row 1 and arrays start at 0
 
         try {
-          // Skip empty rows - check CSV columns directly
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          const hasName = row.name && row.name.toString().trim() !== '';
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          const hasPhone = (row.phone || row.phone2) && (row.phone || row.phone2).toString().trim() !== '';
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          const hasRef = (row.debtor_ref || row.branch_ref) && (row.debtor_ref || row.branch_ref).toString().trim() !== '';
+          // Skip empty rows - check CSV columns directly (handle both old and new column names)
+          const hasName = this.getCsvValue(row, 'Name', 'name') !== undefined;
+          const hasPhone = this.getCsvValue(row, 'SMS Phone', 'SMS_Phone', 'smsPhone', 'phone', 'phone2') !== undefined;
+          const hasRef = this.getCsvValue(row, 'Short Name', 'Short_Name', 'shortName', 'debtor_ref', 'branch_ref') !== undefined;
           
           if (!hasName && !hasPhone && !hasRef) {
             skipped++;
@@ -605,6 +607,20 @@ export class CustomerService {
     return dateValue;
   }
 
+  /**
+   * Helper function to get a value from CSV row using multiple possible column names
+   */
+  private getCsvValue(row: any, ...columnNames: string[]): any {
+    for (const colName of columnNames) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      if (row[colName] !== undefined && row[colName] !== null && row[colName].toString().trim() !== '') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return row[colName];
+      }
+    }
+    return undefined;
+  }
+
   private transformCsvRow(
     row: any,
     rowNumber: number,
@@ -626,39 +642,49 @@ export class CustomerService {
     customerType: CustomerType;
   } {
     // Map CSV columns to entity fields
-    // CSV columns: type,debtor_no,branch_code,debtor_ref,branch_ref,address,tax_id,ntn_no,curr_abrev,terms,sales_type,credit_status,salesman_name,location_name,shipper_name,area,tax_group,group_no,notes,phone,phone2,fax,email,DOB,name,...
+    // Support both old format (debtor_no, phone, area, etc.) and new format (S.No, SMS Phone, City/Area, etc.)
     
     // Extract and map fields from CSV structure with empty value replacement
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const sNo = this.replaceEmptyString(row.debtor_no || row.branch_code);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const name = this.replaceEmptyString(row.name);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const shortName = this.replaceEmptyString(row.debtor_ref || row.branch_ref || row.name).substring(0, 50);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const branchName = this.replaceEmptyString(row.location_name || row.shipper_name, '#####');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const cityArea = this.replaceEmptyString(row.area);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const email = this.replaceEmptyString(row.email);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const smsPhone = this.replaceEmptyString(row.phone || row.phone2);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const currency = this.replaceEmptyString(row.curr_abrev, 'LKR');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const address = this.replaceEmptyString(row.address);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const salesGroup = this.replaceEmptyString(row.group_no, '#####');
+    // Try new format first, then fall back to old format for backward compatibility
+    const sNo = this.replaceEmptyString(
+      this.getCsvValue(row, 'S.No', 'S_No', 'SNo', 'debtor_no', 'branch_code')
+    );
+    const name = this.replaceEmptyString(
+      this.getCsvValue(row, 'Name', 'name')
+    );
+    const shortName = this.replaceEmptyString(
+      this.getCsvValue(row, 'Short Name', 'Short_Name', 'shortName', 'debtor_ref', 'branch_ref', 'name', 'Name')
+    ).substring(0, 50);
+    const branchName = this.replaceEmptyString(
+      this.getCsvValue(row, 'Branch Name', 'Branch_Name', 'branchName', 'location_name', 'shipper_name'),
+      '#####'
+    );
+    const cityArea = this.replaceEmptyString(
+      this.getCsvValue(row, 'City/Area', 'City_Area', 'cityArea', 'area')
+    );
+    const emailRaw = this.getCsvValue(row, 'Email', 'email');
+    const email = emailRaw ? this.replaceEmptyString(emailRaw) : '#####';
+    const smsPhone = this.replaceEmptyString(
+      this.getCsvValue(row, 'SMS Phone', 'SMS_Phone', 'smsPhone', 'phone', 'phone2')
+    );
+    const currency = this.replaceEmptyString(
+      this.getCsvValue(row, 'Currency', 'currency', 'curr_abrev'),
+      'LKR'
+    );
+    const addressRaw = this.getCsvValue(row, 'Address', 'address');
+    const address = addressRaw ? this.replaceEmptyString(addressRaw) : '#####';
+    const salesGroup = this.replaceEmptyString(
+      this.getCsvValue(row, 'Sales Group', 'Sales_Group', 'salesGroup', 'group_no'),
+      '#####'
+    );
 
     // Handle date format - replace empty dates with '2000-01-01'
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const dobValue = row.DOB || row.dob;
+    const dobValue = this.getCsvValue(row, 'DOB', 'dob', 'DOB');
     const dob: Date | null = this.replaceEmptyDate(dobValue);
 
     // Validate and map sales type
     let salesType: SalesType = SalesType.RETAIL;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const salesTypeValue = (row.sales_type || row.salesType || '').toString().trim();
+    const salesTypeValue = (this.getCsvValue(row, 'Sales Type', 'Sales_Type', 'salesType', 'sales_type') || '').toString().trim();
     if (salesTypeValue) {
       const salesTypeUpper = salesTypeValue.toUpperCase();
       if (salesTypeUpper in SalesType) {
@@ -668,10 +694,9 @@ export class CustomerService {
 
     // Validate and map payment terms
     let paymentTerms: PaymentTerms = PaymentTerms.COD_IML;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const termsValue = (row.terms || row.paymentTerms || '').toString().trim();
+    const termsValue = (this.getCsvValue(row, 'Payment Terms', 'Payment_Terms', 'paymentTerms', 'terms') || '').toString().trim();
     if (termsValue) {
-      // Map common payment terms formats (e.g., "COD-IML", "15 Days", "30 Days")
+      // Map common payment terms formats (e.g., "COD-IML", "15 Days", "30 Days", "Bank Transfer", "Cash Only")
       if (termsValue.toUpperCase().includes('COD')) {
         paymentTerms = PaymentTerms.COD_IML;
       } else if (termsValue.includes('15') || termsValue.toLowerCase().includes('fifteen')) {
@@ -682,6 +707,10 @@ export class CustomerService {
         paymentTerms = PaymentTerms.FORTY_FIVE_DAYS;
       } else if (termsValue.includes('60') || termsValue.toLowerCase().includes('sixty')) {
         paymentTerms = PaymentTerms.SIXTY_DAYS;
+      } else if (termsValue.toUpperCase().includes('BANK') || termsValue.toUpperCase().includes('TRANSFER')) {
+        paymentTerms = PaymentTerms.BANK_TRANSFER;
+      } else if (termsValue.toUpperCase().includes('CASH')) {
+        paymentTerms = PaymentTerms.CASH_ONLY;
       }
     }
 
