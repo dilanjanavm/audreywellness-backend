@@ -13,6 +13,19 @@ if (env === 'production') {
   dotenv.config({ path: path.resolve(process.cwd(), envFile) });
   console.log(`🔧 Environment: ${env}`);
   console.log(`📄 Loaded environment files: .env, ${envFile}`);
+} else if (env === 'development') {
+  // Try to load .env.development, but fallback to .env if it doesn't exist
+  const envFile = '.env.development';
+  const envPath = path.resolve(process.cwd(), envFile);
+  try {
+    dotenv.config({ path: envPath, override: false });
+    console.log(`🔧 Environment: ${env}`);
+    console.log(`📄 Loaded environment files: .env, ${envFile}`);
+  } catch (error) {
+    // If .env.development doesn't exist, just use .env (this is fine)
+    console.log(`🔧 Environment: ${env}`);
+    console.log(`📄 Loaded environment file: .env (${envFile} not found, using defaults)`);
+  }
 } else {
   console.log(`🔧 Environment: ${env}`);
   console.log(`📄 Loaded environment file: .env`);

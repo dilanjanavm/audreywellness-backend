@@ -2,12 +2,26 @@
 
 Copy the content below to create your environment files.
 
-## For Development: Create `.env` file
+## For Development: Create `.env.development` file
+
+**Recommended:** Use `.env.development` for development-specific configuration.
+
+1. Copy this template:
+   ```bash
+   # Create .env.development file
+   touch .env.development
+   # or on Windows
+   type nul > .env.development
+   ```
+
+2. Copy the content below into `.env.development`:
 
 ```env
 # ============================================
 # Audrey Wellness Backend - Development Environment
 # ============================================
+# This file overrides .env when NODE_ENV=development
+
 NODE_ENV=development
 
 # ============================================
@@ -25,9 +39,15 @@ DB_PASSWORD=root
 DB_NAME=audreywellnessdb
 
 # ============================================
+# JWT Configuration
+# ============================================
+JWT_SECRET=your-development-jwt-secret-key-change-this-in-production
+JWT_EXPIRES_IN=1d
+
+# ============================================
 # CORS Configuration
 # ============================================
-CORS_ORIGINS=http://localhost:3000,http://localhost:4200,http://localhost:8080
+CORS_ORIGINS=http://localhost:3000,http://localhost:4200,http://localhost:8080,http://localhost:3001,http://localhost:3002,http://localhost:3004
 
 # ============================================
 # Email Configuration
