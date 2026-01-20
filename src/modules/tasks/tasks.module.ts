@@ -9,6 +9,7 @@ import { TaskRecipeStepExecutionEntity } from './entities/task-recipe-step-execu
 import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';
 import { RecipeExecutionService } from './recipe-execution.service';
+import { RecipeExecutionController } from './recipe-execution.controller';
 import { User } from '../users/user.entity';
 import { CostingEntity } from '../costing/entities/costing.entity';
 import { CostingModule } from '../costing/costing.module';
@@ -29,7 +30,7 @@ import { RecipesModule } from '../recipes/recipes.module';
     CostingModule, // Import to access CostingService
     RecipesModule, // Import to access RecipesService
   ],
-  controllers: [TasksController],
+  controllers: [TasksController, RecipeExecutionController],
   providers: [TasksService, RecipeExecutionService],
   exports: [TasksService, RecipeExecutionService],
 })
