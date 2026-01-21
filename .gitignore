@@ -19,7 +19,7 @@ GOOGLE_EMAIL_SETUP
 # Tests
 /coverage
 /.nyc_output
-
+.docs
 # IDEs and editors
 /.idea
 .project

@@ -15,6 +15,8 @@ import {
   UpdateStepProgressDto,
   CompleteStepDto,
   RecipeExecutionStatusDto,
+  PauseExecutionDto,
+  ResumeExecutionDto,
 } from './dto/recipe-execution.dto';
 
 @Controller('tasks/:taskId/recipe')
@@ -46,9 +48,10 @@ export class RecipeExecutionController {
   @Post('pause')
   async pauseExecution(
     @Param('taskId') taskId: string,
+    @Body() dto: PauseExecutionDto,
   ): Promise<RecipeExecutionStatusDto> {
     this.logger.log(`Pausing recipe execution for task: ${taskId}`);
-    return this.recipeExecutionService.pauseExecution(taskId);
+    return this.recipeExecutionService.pauseExecution(taskId, dto);
   }
 
   /**
@@ -58,9 +61,10 @@ export class RecipeExecutionController {
   @Post('resume')
   async resumeExecution(
     @Param('taskId') taskId: string,
+    @Body() dto: ResumeExecutionDto,
   ): Promise<RecipeExecutionStatusDto> {
     this.logger.log(`Resuming recipe execution for task: ${taskId}`);
-    return this.recipeExecutionService.resumeExecution(taskId);
+    return this.recipeExecutionService.resumeExecution(taskId, dto);
   }
 
   /**
