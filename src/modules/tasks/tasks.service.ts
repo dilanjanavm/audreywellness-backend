@@ -1180,11 +1180,6 @@ export class TasksService {
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
       updatedBy: task.updatedBy,
-      // Filling & Packing phase specific fields
-      orderNumber: task.orderNumber,
-      customerName: task.customerName,
-      customerMobile: task.customerMobile,
-      customerAddress: task.customerAddress,
     };
   }
 
