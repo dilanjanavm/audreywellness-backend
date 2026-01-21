@@ -96,6 +96,7 @@ export class RecipeExecutionService {
             stepOrder: step.order,
             status: StepExecutionStatus.PENDING,
             progress: 0,
+            stepElapsedTime: 0, // Initialize elapsed time
           }),
         );
 
@@ -250,31 +251,29 @@ export class RecipeExecutionService {
       throw new NotFoundException('Current step execution not found');
     }
 
-    // Calculate elapsed time for current step
-    // Account for resume time if step was previously paused
+    // Calculate elapsed time for current step since last start/resume
+    // This accumulates time only when step is actually running (excludes pause time)
+    const now = new Date();
+    let additionalElapsedTime = 0;
+
     if (currentStepExecution.startedAt) {
-      const now = new Date();
-      let stepElapsed = 0;
+      // Determine the reference point for calculation
+      // If step was previously resumed, calculate from resume time
+      // Otherwise, calculate from start time
+      const referenceTime = currentStepExecution.resumedAt || currentStepExecution.startedAt;
       
-      // If step was paused and resumed, we need to account for the pause duration
-      if (currentStepExecution.pausedAt && execution.resumedAt) {
-        // Calculate time from start to pause
-        const timeToPause =
-          (currentStepExecution.pausedAt.getTime() - currentStepExecution.startedAt.getTime()) /
-          (1000 * 60);
-        // Calculate time from resume to now
-        const timeFromResume =
-          (now.getTime() - execution.resumedAt.getTime()) /
-          (1000 * 60);
-        stepElapsed = timeToPause + timeFromResume;
-      } else {
-        // Normal case: from start to now
-        stepElapsed =
-          (now.getTime() - currentStepExecution.startedAt.getTime()) /
-          (1000 * 60);
-      }
-      
-      execution.totalElapsedTime += Math.floor(stepElapsed);
+      // Calculate time elapsed since reference time (in minutes)
+      additionalElapsedTime = Math.floor(
+        (now.getTime() - referenceTime.getTime()) / (1000 * 60)
+      );
+
+      // Add to accumulated step elapsed time
+      currentStepExecution.stepElapsedTime = 
+        (currentStepExecution.stepElapsedTime || 0) + additionalElapsedTime;
+
+      // Add to total execution elapsed time
+      execution.totalElapsedTime = 
+        (execution.totalElapsedTime || 0) + additionalElapsedTime;
     }
 
     // Pause execution and current step
@@ -332,9 +331,9 @@ export class RecipeExecutionService {
     execution.resumedAt = resumeTime;
 
     currentStepExecution.status = StepExecutionStatus.IN_PROGRESS;
-    // Clear pausedAt to track that we've resumed
+    currentStepExecution.resumedAt = resumeTime; // Track resume time for this step
+    // Keep pausedAt for tracking - don't clear it
     // Don't update startedAt - keep original start time for accurate duration tracking
-    currentStepExecution.pausedAt = undefined;
 
     await this.executionRepository.save(execution);
     await this.stepExecutionRepository.save(currentStepExecution);
@@ -463,16 +462,22 @@ export class RecipeExecutionService {
       );
     }
 
-    // Calculate actual duration
+    // Calculate actual duration from accumulated elapsed time
+    // Update elapsed time one final time before completion
     if (stepExecution.startedAt) {
-      const duration =
-        (new Date().getTime() - stepExecution.startedAt.getTime()) /
-        (1000 * 60); // Convert to minutes
-      stepExecution.actualDuration = Math.floor(duration);
+      const now = new Date();
+      const referenceTime = stepExecution.resumedAt || stepExecution.startedAt;
+      const additionalTime = Math.floor(
+        (now.getTime() - referenceTime.getTime()) / (1000 * 60)
+      );
+      stepExecution.stepElapsedTime = (stepExecution.stepElapsedTime || 0) + additionalTime;
+      stepExecution.actualDuration = stepExecution.stepElapsedTime;
     }
 
     if (dto.actualDuration !== undefined) {
       stepExecution.actualDuration = dto.actualDuration;
+      // Also update stepElapsedTime to match
+      stepExecution.stepElapsedTime = dto.actualDuration;
     }
     if (dto.actualTemperature !== undefined) {
       stepExecution.actualTemperature = dto.actualTemperature;
@@ -503,6 +508,8 @@ export class RecipeExecutionService {
       nextStep.status = StepExecutionStatus.IN_PROGRESS;
       nextStep.startedAt = new Date();
       nextStep.progress = 0;
+      nextStep.stepElapsedTime = 0; // Initialize elapsed time
+      nextStep.resumedAt = undefined; // Clear any previous resume time
 
       execution.currentStepId = nextStep.recipeStepId;
       execution.currentStepOrder = nextStep.stepOrder;
@@ -637,40 +644,29 @@ export class RecipeExecutionService {
 
       if (currentStepExecution && recipeStep) {
         // Calculate current step elapsed time
-        if (currentStepExecution.startedAt) {
+        let calculatedElapsedTime = currentStepExecution.stepElapsedTime || 0;
+
+        if (currentStepExecution.status === StepExecutionStatus.IN_PROGRESS && currentStepExecution.startedAt) {
+          // If in progress, add time since last start/resume
           const now = new Date();
-          if (currentStepExecution.status === StepExecutionStatus.IN_PROGRESS) {
-            // If in progress, calculate from start to now
-            // Account for resume time if execution was resumed
-            if (execution.resumedAt && execution.pausedAt) {
-              // Calculate time from start to pause + time from resume to now
-              const timeToPause =
-                (execution.pausedAt.getTime() - currentStepExecution.startedAt.getTime()) /
-                (1000 * 60);
-              const timeFromResume =
-                (now.getTime() - execution.resumedAt.getTime()) /
-                (1000 * 60);
-              currentStepElapsedTime = Math.floor(timeToPause + timeFromResume);
-            } else {
-              // Normal case: from start to now
-              currentStepElapsedTime = Math.floor(
-                (now.getTime() - currentStepExecution.startedAt.getTime()) /
-                (1000 * 60),
-              );
-            }
-          } else if (currentStepExecution.status === StepExecutionStatus.PAUSED) {
-            // If paused, calculate from start to pause time
-            if (execution.pausedAt) {
-              currentStepElapsedTime = Math.floor(
-                (execution.pausedAt.getTime() - currentStepExecution.startedAt.getTime()) /
-                (1000 * 60),
-              );
-            }
-          } else if (currentStepExecution.completedAt) {
-            // If completed, use actual duration
-            currentStepElapsedTime = currentStepExecution.actualDuration;
-          }
+          const referenceTime = currentStepExecution.resumedAt || currentStepExecution.startedAt;
+          const additionalTime = Math.floor(
+            (now.getTime() - referenceTime.getTime()) / (1000 * 60)
+          );
+          calculatedElapsedTime = calculatedElapsedTime + additionalTime;
+        } else if (currentStepExecution.status === StepExecutionStatus.PAUSED) {
+          // If paused, use the saved elapsed time (already updated when paused)
+          calculatedElapsedTime = currentStepExecution.stepElapsedTime || 0;
+        } else if (currentStepExecution.status === StepExecutionStatus.COMPLETED && currentStepExecution.actualDuration) {
+          // If completed, use actual duration
+          calculatedElapsedTime = currentStepExecution.actualDuration;
         }
+
+        currentStepElapsedTime = calculatedElapsedTime;
+
+        // Calculate remaining time (recipe step duration - elapsed time)
+        const stepDuration = recipeStep.duration; // Duration in minutes from recipe
+        const remainingTime = stepDuration ? Math.max(0, stepDuration - calculatedElapsedTime) : undefined;
 
         currentStep = {
           stepId: currentStepExecution.recipeStepId,
@@ -679,7 +675,9 @@ export class RecipeExecutionService {
           progress: Number(execution.currentStepProgress),
           status: currentStepExecution.status,
           startedAt: currentStepExecution.startedAt,
-          elapsedTime: currentStepElapsedTime,
+          elapsedTime: calculatedElapsedTime,
+          remainingTime: remainingTime,
+          stepDuration: stepDuration,
         };
       }
     }
@@ -716,6 +714,7 @@ export class RecipeExecutionService {
       completedSteps,
       elapsedTime: execution.totalElapsedTime,
       currentStepElapsedTime,
+      currentStepRemainingTime: currentStep?.remainingTime,
       startedAt: execution.startedAt,
       pausedAt: execution.pausedAt,
       resumedAt: execution.resumedAt,

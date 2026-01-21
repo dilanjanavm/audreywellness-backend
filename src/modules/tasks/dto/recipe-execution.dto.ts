@@ -83,13 +83,16 @@ export class RecipeExecutionStatusDto {
     progress: number;
     status: StepExecutionStatus;
     startedAt?: Date;
-    elapsedTime?: number; // Current step elapsed time in minutes
+    elapsedTime?: number; // Current step elapsed time in minutes (accumulated, excludes pause time)
+    remainingTime?: number; // Remaining time for current step in minutes (duration - elapsedTime)
+    stepDuration?: number; // Original step duration from recipe (in minutes)
   };
   overallProgress: number; // Percentage of all steps completed
   totalSteps: number;
   completedSteps: number;
   elapsedTime: number; // Total elapsed time in minutes (accumulated)
   currentStepElapsedTime?: number; // Current step elapsed time in minutes (for active steps)
+  currentStepRemainingTime?: number; // Remaining time for current step in minutes
   startedAt?: Date;
   pausedAt?: Date;
   resumedAt?: Date;

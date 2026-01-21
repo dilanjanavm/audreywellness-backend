@@ -85,6 +85,11 @@ export interface TaskBaseDto {
   views?: number;
   order?: number;
   updatedBy?: string;
+  // Filling & Packing Phase Specific Fields (optional for other phases, required for Filling & Packing)
+  orderNumber?: string; // Order number - REQUIRED for Filling & Packing phase
+  customerName?: string; // Customer name - REQUIRED for Filling & Packing phase
+  customerMobile?: string; // Customer mobile number (validated for SMS) - REQUIRED for Filling & Packing phase
+  customerAddress?: string; // Customer address - REQUIRED for Filling & Packing phase
 }
 
 export interface CreateTaskDto extends TaskBaseDto {}
@@ -124,6 +129,11 @@ export interface TaskResponseDto {
   createdAt: Date;
   updatedAt: Date;
   updatedBy?: string;
+  // Filling & Packing Phase Specific Fields
+  orderNumber?: string;
+  customerName?: string;
+  customerMobile?: string;
+  customerAddress?: string;
 }
 
 export interface PhaseTaskFilters {
