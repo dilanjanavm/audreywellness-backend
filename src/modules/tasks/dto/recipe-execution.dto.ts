@@ -38,6 +38,11 @@ export class CompleteStepDto {
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  remainingTime?: number; // Remaining time when completing (in minutes, optional)
+
+  @IsOptional()
+  @IsNumber()
   actualTemperature?: number;
 
   @IsOptional()
@@ -49,12 +54,22 @@ export class PauseExecutionDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  remainingTime?: number; // Remaining time for current step in minutes (from frontend timer)
 }
 
 export class ResumeExecutionDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  remainingTime?: number; // Remaining time for current step in minutes (from frontend timer, optional)
 }
 
 // Response DTOs

@@ -19,6 +19,8 @@ import {
   CompleteStepDto,
   RecipeExecutionStatusDto,
   StepExecutionStatusDto,
+  PauseExecutionDto,
+  ResumeExecutionDto,
 } from './dto/recipe-execution.dto';
 import { RecipesService } from '../recipes/recipes.service';
 import { RecipeStep } from '../recipes/entities/recipe-step.entity';
@@ -223,9 +225,11 @@ export class RecipeExecutionService {
 
   /**
    * Pause recipe execution
+   * Accepts remainingTime from frontend to sync timer
    */
   async pauseExecution(
     taskId: string,
+    dto: PauseExecutionDto = {},
   ): Promise<RecipeExecutionStatusDto> {
     const execution = await this.getExecutionByTaskId(taskId);
 
@@ -251,29 +255,57 @@ export class RecipeExecutionService {
       throw new NotFoundException('Current step execution not found');
     }
 
-    // Calculate elapsed time for current step since last start/resume
-    // This accumulates time only when step is actually running (excludes pause time)
-    const now = new Date();
-    let additionalElapsedTime = 0;
+    // Get recipe to access step duration
+    const recipe = await this.recipesService.findOne(execution.recipeId, false);
+    const recipeStep = recipe.steps?.find(
+      (s) => s.id === currentStepExecution.recipeStepId,
+    );
 
-    if (currentStepExecution.startedAt) {
-      // Determine the reference point for calculation
-      // If step was previously resumed, calculate from resume time
-      // Otherwise, calculate from start time
-      const referenceTime = currentStepExecution.resumedAt || currentStepExecution.startedAt;
-      
-      // Calculate time elapsed since reference time (in minutes)
-      additionalElapsedTime = Math.floor(
-        (now.getTime() - referenceTime.getTime()) / (1000 * 60)
+    if (!recipeStep) {
+      throw new NotFoundException('Recipe step not found');
+    }
+
+    const stepDuration = recipeStep.duration; // Original step duration in minutes
+
+    // Calculate elapsed time - prefer remainingTime from frontend if provided
+    let calculatedElapsedTime: number;
+
+    if (dto.remainingTime !== undefined && dto.remainingTime !== null) {
+      // Use remaining time from frontend (more accurate)
+      // elapsedTime = stepDuration - remainingTime
+      calculatedElapsedTime = Math.max(0, stepDuration - dto.remainingTime);
+      this.logger.log(
+        `pauseExecution - Using remainingTime from request: ${dto.remainingTime}, calculated elapsedTime: ${calculatedElapsedTime}`,
       );
+    } else {
+      // Fallback: Calculate from timestamps
+      if (currentStepExecution.startedAt) {
+        const now = new Date();
+        const referenceTime =
+          currentStepExecution.resumedAt || currentStepExecution.startedAt;
+        const additionalElapsedTime = Math.floor(
+          (now.getTime() - referenceTime.getTime()) / (1000 * 60),
+        );
+        calculatedElapsedTime =
+          (currentStepExecution.stepElapsedTime || 0) + additionalElapsedTime;
+        this.logger.log(
+          `pauseExecution - Calculated elapsedTime from timestamps: ${calculatedElapsedTime}`,
+        );
+      } else {
+        calculatedElapsedTime = currentStepExecution.stepElapsedTime || 0;
+      }
+    }
 
-      // Add to accumulated step elapsed time
-      currentStepExecution.stepElapsedTime = 
-        (currentStepExecution.stepElapsedTime || 0) + additionalElapsedTime;
+    // Update step elapsed time
+    const previousElapsedTime = currentStepExecution.stepElapsedTime || 0;
+    const additionalTime = calculatedElapsedTime - previousElapsedTime;
 
-      // Add to total execution elapsed time
-      execution.totalElapsedTime = 
-        (execution.totalElapsedTime || 0) + additionalElapsedTime;
+    currentStepExecution.stepElapsedTime = calculatedElapsedTime;
+
+    // Add additional time to total execution elapsed time
+    if (additionalTime > 0) {
+      execution.totalElapsedTime =
+        (execution.totalElapsedTime || 0) + additionalTime;
     }
 
     // Pause execution and current step
@@ -286,7 +318,6 @@ export class RecipeExecutionService {
     await this.executionRepository.save(execution);
     await this.stepExecutionRepository.save(currentStepExecution);
 
-    const recipe = await this.recipesService.findOne(execution.recipeId, false);
     const stepExecutions = await this.stepExecutionRepository.find({
       where: { executionId: execution.id },
       order: { stepOrder: 'ASC' },
@@ -297,9 +328,11 @@ export class RecipeExecutionService {
 
   /**
    * Resume recipe execution
+   * Accepts optional remainingTime from frontend to sync timer
    */
   async resumeExecution(
     taskId: string,
+    dto: ResumeExecutionDto = {},
   ): Promise<RecipeExecutionStatusDto> {
     const execution = await this.getExecutionByTaskId(taskId);
 
@@ -325,6 +358,47 @@ export class RecipeExecutionService {
       throw new NotFoundException('Current step execution not found');
     }
 
+    // Get recipe to access step duration
+    const recipe = await this.recipesService.findOne(execution.recipeId, false);
+    const recipeStep = recipe.steps?.find(
+      (s) => s.id === currentStepExecution.recipeStepId,
+    );
+
+    if (!recipeStep) {
+      throw new NotFoundException('Recipe step not found');
+    }
+
+    const stepDuration = recipeStep.duration; // Original step duration in minutes
+
+    // If remainingTime provided, update elapsed time accordingly
+    if (dto.remainingTime !== undefined && dto.remainingTime !== null) {
+      // Calculate elapsed time from remaining time
+      const calculatedElapsedTime = Math.max(
+        0,
+        stepDuration - dto.remainingTime,
+      );
+      
+      // Update step elapsed time if different (frontend might have more accurate timer)
+      if (
+        Math.abs(calculatedElapsedTime - (currentStepExecution.stepElapsedTime || 0)) > 0
+      ) {
+        const previousElapsedTime = currentStepExecution.stepElapsedTime || 0;
+        const timeDifference = calculatedElapsedTime - previousElapsedTime;
+        
+        currentStepExecution.stepElapsedTime = calculatedElapsedTime;
+        
+        // Adjust total elapsed time if needed
+        if (timeDifference !== 0) {
+          execution.totalElapsedTime =
+            (execution.totalElapsedTime || 0) + timeDifference;
+        }
+        
+        this.logger.log(
+          `resumeExecution - Updated elapsedTime from remainingTime: ${dto.remainingTime}, new elapsedTime: ${calculatedElapsedTime}`,
+        );
+      }
+    }
+
     // Resume execution and current step
     execution.status = RecipeExecutionStatus.IN_PROGRESS;
     const resumeTime = new Date();
@@ -338,7 +412,6 @@ export class RecipeExecutionService {
     await this.executionRepository.save(execution);
     await this.stepExecutionRepository.save(currentStepExecution);
 
-    const recipe = await this.recipesService.findOne(execution.recipeId, false);
     const stepExecutions = await this.stepExecutionRepository.find({
       where: { executionId: execution.id },
       order: { stepOrder: 'ASC' },
@@ -462,23 +535,64 @@ export class RecipeExecutionService {
       );
     }
 
-    // Calculate actual duration from accumulated elapsed time
-    // Update elapsed time one final time before completion
-    if (stepExecution.startedAt) {
-      const now = new Date();
-      const referenceTime = stepExecution.resumedAt || stepExecution.startedAt;
-      const additionalTime = Math.floor(
-        (now.getTime() - referenceTime.getTime()) / (1000 * 60)
-      );
-      stepExecution.stepElapsedTime = (stepExecution.stepElapsedTime || 0) + additionalTime;
-      stepExecution.actualDuration = stepExecution.stepElapsedTime;
+    // Get recipe to access step duration
+    const recipe = await this.recipesService.findOne(execution.recipeId, false);
+    const recipeStep = recipe.steps?.find(
+      (s) => s.id === stepExecution.recipeStepId,
+    );
+
+    if (!recipeStep) {
+      throw new NotFoundException('Recipe step not found');
     }
 
-    if (dto.actualDuration !== undefined) {
-      stepExecution.actualDuration = dto.actualDuration;
-      // Also update stepElapsedTime to match
-      stepExecution.stepElapsedTime = dto.actualDuration;
+    const stepDuration = recipeStep.duration; // Original step duration in minutes
+
+    // Calculate actual duration - prefer remainingTime or actualDuration from frontend if provided
+    let calculatedElapsedTime: number;
+
+    if (dto.remainingTime !== undefined && dto.remainingTime !== null) {
+      // Use remaining time from frontend
+      calculatedElapsedTime = Math.max(0, stepDuration - dto.remainingTime);
+      this.logger.log(
+        `completeStep - Using remainingTime from request: ${dto.remainingTime}, calculated elapsedTime: ${calculatedElapsedTime}`,
+      );
+    } else if (dto.actualDuration !== undefined) {
+      // Use actualDuration from frontend
+      calculatedElapsedTime = dto.actualDuration;
+      this.logger.log(
+        `completeStep - Using actualDuration from request: ${calculatedElapsedTime}`,
+      );
+    } else {
+      // Calculate from timestamps
+      if (stepExecution.startedAt) {
+        const now = new Date();
+        const referenceTime = stepExecution.resumedAt || stepExecution.startedAt;
+        const additionalTime = Math.floor(
+          (now.getTime() - referenceTime.getTime()) / (1000 * 60),
+        );
+        calculatedElapsedTime =
+          (stepExecution.stepElapsedTime || 0) + additionalTime;
+        this.logger.log(
+          `completeStep - Calculated elapsedTime from timestamps: ${calculatedElapsedTime}`,
+        );
+      } else {
+        calculatedElapsedTime = stepExecution.stepElapsedTime || 0;
+      }
     }
+
+    // Update step elapsed time and actual duration
+    const previousElapsedTime = stepExecution.stepElapsedTime || 0;
+    const additionalTime = calculatedElapsedTime - previousElapsedTime;
+
+    stepExecution.stepElapsedTime = calculatedElapsedTime;
+    stepExecution.actualDuration = calculatedElapsedTime;
+
+    // Add additional time to total execution elapsed time
+    if (additionalTime > 0) {
+      execution.totalElapsedTime =
+        (execution.totalElapsedTime || 0) + additionalTime;
+    }
+
     if (dto.actualTemperature !== undefined) {
       stepExecution.actualTemperature = dto.actualTemperature;
     }
@@ -526,8 +640,7 @@ export class RecipeExecutionService {
 
     await this.executionRepository.save(execution);
 
-    const recipe = await this.recipesService.findOne(execution.recipeId, false);
-
+    // Recipe already loaded above, reuse it
     return this.mapToStatusDto(execution, recipe, allStepExecutions);
   }
 
