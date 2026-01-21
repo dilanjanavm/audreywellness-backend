@@ -155,6 +155,24 @@ CITYPAK_STAGING_URL=https://staging.citypak.lk
 CITYPAK_STAGING_API_TOKEN=your-staging-token
 ```
 
+### SMS Gateway Configuration
+
+To use SMS functionality (Send.lk integration):
+
+```env
+# Get your API token from: https://sms.send.lk (Dashboard -> API Settings)
+# Token format: {id}|{token} (e.g., 1896|K9RwzV0LqmbwnKXfPwvuWo66qTEaC8WbBISd72xZ)
+SENDLK_API_TOKEN=your-send-lk-api-token-here
+# Alternative variable name (both work):
+# SMS_API_TOKEN=your-send-lk-api-token-here
+```
+
+**How to get your Send.lk API token:**
+1. Log in to https://sms.send.lk
+2. Go to Dashboard -> API Settings
+3. Copy your API token (format: `{id}|{token}`)
+4. Paste it in your `.env.development` file
+
 ## Running Commands
 
 ### Start Development Server

@@ -408,6 +408,13 @@ export class TasksService {
       this.logger.debug(`createTask - Validating status ${dto.status} is allowed in phase`);
       this.ensureStatusInPhase(dto.status, phase);
 
+      // Validate Filling & Packing phase specific requirements
+      const isFillingAndPackingPhase = phase.name.toLowerCase() === 'filling & packing';
+      if (isFillingAndPackingPhase) {
+        this.logger.debug(`createTask - Validating Filling & Packing phase requirements`);
+        this.validateFillingAndPackingRequirements(dto);
+      }
+
       // Parse due date
       const dueDate = this.parseDate(dto.dueDate);
       if (dueDate) {
@@ -488,6 +495,11 @@ export class TasksService {
         assigneeName: assignedUser?.userName || assigneeProfile?.name,
         assigneeRole: assignedUser?.role?.code || assigneeProfile?.role,
         updatedBy: dto.updatedBy,
+        // Filling & Packing phase specific fields
+        orderNumber: dto.orderNumber,
+        customerName: dto.customerName,
+        customerMobile: dto.customerMobile,
+        customerAddress: dto.customerAddress,
       });
 
       // Save task
@@ -540,6 +552,18 @@ export class TasksService {
     const status = dto.status ?? task.status;
     this.ensureStatusesValid([status]);
     this.ensureStatusInPhase(status, phase);
+
+    // Validate Filling & Packing phase specific requirements if phase is changing or already is Filling & Packing
+    const isFillingAndPackingPhase = phase.name.toLowerCase() === 'filling & packing';
+    if (isFillingAndPackingPhase) {
+      // If updating to Filling & Packing phase, validate required fields
+      const updateDto: CreateTaskDto = {
+        ...task,
+        ...dto,
+        phaseId: phase.id,
+      } as CreateTaskDto;
+      this.validateFillingAndPackingRequirements(updateDto);
+    }
 
     const shouldMovePhase = phase.id !== task.phaseId;
     const shouldMoveStatus = status !== task.status;
@@ -646,6 +670,24 @@ export class TasksService {
           task.assigneeRole = assigneeProfile?.role;
         }
       }
+    }
+
+    // Handle Filling & Packing phase specific fields
+    if (dto.orderNumber !== undefined) {
+      task.orderNumber = dto.orderNumber;
+    }
+    if (dto.customerName !== undefined) {
+      task.customerName = dto.customerName;
+    }
+    if (dto.customerMobile !== undefined) {
+      // Validate mobile number if provided
+      if (dto.customerMobile && dto.customerMobile.trim() !== '') {
+        this.validateMobileNumber(dto.customerMobile);
+      }
+      task.customerMobile = dto.customerMobile;
+    }
+    if (dto.customerAddress !== undefined) {
+      task.customerAddress = dto.customerAddress;
     }
 
     const saved = await this.taskRepository.save(task);
@@ -1089,15 +1131,20 @@ export class TasksService {
 
     const phaseId = phaseOverrideId ?? task.phaseId ?? task.phase?.id ?? '';
 
-    return {
-      id: task.id,
-      taskId: task.taskId,
-      phaseId,
-      status: task.status,
-      order: task.order,
-      task: task.task,
-      description: task.description,
-      priority: task.priority,
+      return {
+        id: task.id,
+        taskId: task.taskId,
+        phaseId,
+        status: task.status,
+        order: task.order,
+        task: task.task,
+        description: task.description,
+        priority: task.priority,
+        // Filling & Packing phase specific fields
+        orderNumber: task.orderNumber,
+        customerName: task.customerName,
+        customerMobile: task.customerMobile,
+        customerAddress: task.customerAddress,
       dueDate: task.dueDate,
       assignee: profile,
       assignedUserId: task.assignedUserId,
@@ -1133,7 +1180,101 @@ export class TasksService {
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
       updatedBy: task.updatedBy,
+      // Filling & Packing phase specific fields
+      orderNumber: task.orderNumber,
+      customerName: task.customerName,
+      customerMobile: task.customerMobile,
+      customerAddress: task.customerAddress,
     };
+  }
+
+  /**
+   * Validate Filling & Packing phase specific requirements
+   * For this phase, orderNumber, customerName, customerMobile, and customerAddress are required
+   * Mobile number must be valid for SMS sending
+   */
+  private validateFillingAndPackingRequirements(dto: CreateTaskDto): void {
+    this.logger.debug('validateFillingAndPackingRequirements - Validating requirements');
+
+    // Check required fields
+    if (!dto.orderNumber || dto.orderNumber.trim() === '') {
+      throw new BadRequestException(
+        'orderNumber is required for Filling & Packing phase tasks',
+      );
+    }
+
+    if (!dto.customerName || dto.customerName.trim() === '') {
+      throw new BadRequestException(
+        'customerName is required for Filling & Packing phase tasks',
+      );
+    }
+
+    if (!dto.customerMobile || dto.customerMobile.trim() === '') {
+      throw new BadRequestException(
+        'customerMobile is required for Filling & Packing phase tasks',
+      );
+    }
+
+    if (!dto.customerAddress || dto.customerAddress.trim() === '') {
+      throw new BadRequestException(
+        'customerAddress is required for Filling & Packing phase tasks',
+      );
+    }
+
+    // Validate mobile number format (for SMS sending)
+    this.validateMobileNumber(dto.customerMobile);
+
+    this.logger.debug('validateFillingAndPackingRequirements - All requirements validated');
+  }
+
+  /**
+   * Validate mobile number format for SMS sending
+   * Supports international format with country code or local format
+   * Examples: +94771234567, 94771234567, 0771234567, 771234567
+   */
+  private validateMobileNumber(mobile: string): void {
+    // Remove any whitespace
+    const cleaned = mobile.trim().replace(/\s+/g, '');
+
+    // Check if empty
+    if (!cleaned) {
+      throw new BadRequestException('Mobile number cannot be empty');
+    }
+
+    // Remove leading + if present
+    const withoutPlus = cleaned.startsWith('+') ? cleaned.substring(1) : cleaned;
+
+    // Check if it's all digits
+    if (!/^\d+$/.test(withoutPlus)) {
+      throw new BadRequestException(
+        'Mobile number must contain only digits (and optional + prefix)',
+      );
+    }
+
+    // Check length (minimum 9 digits, maximum 15 digits - international standard)
+    if (withoutPlus.length < 9 || withoutPlus.length > 15) {
+      throw new BadRequestException(
+        'Mobile number must be between 9 and 15 digits',
+      );
+    }
+
+    // For Sri Lankan numbers: should start with 94 (country code) or 0 (local format)
+    // Local format: 07XXXXXXXX (10 digits starting with 0)
+    // International format: 947XXXXXXXXX (12 digits starting with 94)
+    const isSriLankanLocal = /^0[1-9]\d{8}$/.test(withoutPlus);
+    const isSriLankanInternational = /^94[1-9]\d{8}$/.test(withoutPlus);
+
+    // Accept Sri Lankan format or international format
+    if (!isSriLankanLocal && !isSriLankanInternational) {
+      // Check if it's a valid international format (country code + number)
+      if (!/^[1-9]\d{8,14}$/.test(withoutPlus)) {
+        this.logger.warn(
+          `Mobile number format may not be valid for SMS: ${mobile}`,
+        );
+      }
+    }
+
+    this.logger.debug(`Mobile number validated: ${mobile}`);
   }
 
   private ensureStatusesValid(statuses?: TaskStatus[]) {

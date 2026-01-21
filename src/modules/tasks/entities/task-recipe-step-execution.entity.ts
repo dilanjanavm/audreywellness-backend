@@ -64,12 +64,19 @@ export class TaskRecipeStepExecutionEntity {
   @Column({ name: 'actual_duration', type: 'int', nullable: true })
   actualDuration?: number; // in minutes
 
+  // Accumulated elapsed time for this step (in minutes) - excludes pause time
+  @Column({ name: 'step_elapsed_time', type: 'int', default: 0 })
+  stepElapsedTime: number;
+
   // Timestamps
   @Column({ name: 'started_at', type: 'datetime', nullable: true })
   startedAt?: Date;
 
   @Column({ name: 'paused_at', type: 'datetime', nullable: true })
   pausedAt?: Date;
+
+  @Column({ name: 'resumed_at', type: 'datetime', nullable: true })
+  resumedAt?: Date; // Track when this step was last resumed
 
   @Column({ name: 'completed_at', type: 'datetime', nullable: true })
   completedAt?: Date;

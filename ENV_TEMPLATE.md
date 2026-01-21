@@ -80,6 +80,16 @@ CITYPAK_STAGING_API_TOKEN=your-staging-api-token-here
 # Production Configuration
 CITYPAK_PRODUCTION_URL=https://falcon.citypak.lk
 CITYPAK_PRODUCTION_API_TOKEN=your-production-api-token-here
+
+# ============================================
+# SMS Gateway (Send.lk) Configuration
+# ============================================
+# Get your API token from: https://sms.send.lk (Dashboard -> API Settings)
+# Token format: {id}|{token}
+# Example: 1896|K9RwzV0LqmbwnKXfPwvuWo66qTEaC8WbBISd72xZ
+SENDLK_API_TOKEN=your-send-lk-api-token-here
+# Alternative variable name (both work):
+# SMS_API_TOKEN=your-send-lk-api-token-here
 ```
 
 ---
@@ -132,6 +142,16 @@ FRONTEND_URL=http://206.189.82.117:8080
 # Production Configuration
 CITYPAK_PRODUCTION_URL=https://falcon.citypak.lk
 CITYPAK_PRODUCTION_API_TOKEN=your-production-api-token-here
+
+# ============================================
+# SMS Gateway (Send.lk) Configuration
+# ============================================
+# Get your API token from: https://sms.send.lk (Dashboard -> API Settings)
+# Token format: {id}|{token}
+# Example: 1896|K9RwzV0LqmbwnKXfPwvuWo66qTEaC8WbBISd72xZ
+SENDLK_API_TOKEN=your-send-lk-api-token-here
+# Alternative variable name (both work):
+# SMS_API_TOKEN=your-send-lk-api-token-here
 ```
 
 ---

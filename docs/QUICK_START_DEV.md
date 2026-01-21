@@ -48,6 +48,11 @@ EMAIL_PASSWORD=your-app-password
 # Courier (Optional)
 CITYPAK_STAGING_URL=https://staging.citypak.lk
 CITYPAK_STAGING_API_TOKEN=your-token
+
+# SMS Gateway (Optional)
+# Get token from: https://sms.send.lk (Dashboard -> API Settings)
+# Format: {id}|{token}
+SENDLK_API_TOKEN=your-send-lk-api-token-here
 ```
 
 **Update the values** with your local settings (especially database credentials).

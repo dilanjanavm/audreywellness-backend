@@ -151,6 +151,7 @@ npm run start:prod
 | `EMAIL_USE_OAUTH2` | `false` | Use OAuth2 for email |
 | `CITYPAK_STAGING_API_TOKEN` | - | Citypak staging token |
 | `CITYPAK_PRODUCTION_API_TOKEN` | - | Citypak production token |
+| `SENDLK_API_TOKEN` or `SMS_API_TOKEN` | - | Send.lk SMS API token (format: `{id}|{token}`) |
 | `FRONTEND_URL` | `http://localhost:3000` | Frontend URL for email links |
 
 ## CORS Configuration

@@ -20,6 +20,7 @@ import { PermissionsModule } from './modules/permissions/permissions.module';
 import { RolePermissionsModule } from './modules/role-permissions/role-permissions.module';
 import { RecipesModule } from './modules/recipes/recipes.module';
 import { CourierModule } from './modules/courier/courier.module';
+import { SmsModule } from './modules/sms/sms.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { CourierModule } from './modules/courier/courier.module';
     RolePermissionsModule,
     RecipesModule,
     CourierModule,
+    SmsModule,
   ],
   controllers: [],
   providers: [],

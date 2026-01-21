@@ -125,6 +125,19 @@ export class TaskEntity {
   @Column({ nullable: true })
   updatedBy?: string;
 
+  // Filling & Packing Phase Specific Fields
+  @Column({ name: 'order_number', nullable: true })
+  orderNumber?: string; // Order number for Filling & Packing tasks
+
+  @Column({ name: 'customer_name', nullable: true })
+  customerName?: string; // Customer name for Filling & Packing tasks
+
+  @Column({ name: 'customer_mobile', nullable: true })
+  customerMobile?: string; // Customer mobile number (validated for SMS sending)
+
+  @Column({ name: 'customer_address', type: 'text', nullable: true })
+  customerAddress?: string; // Customer address for Filling & Packing tasks
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
