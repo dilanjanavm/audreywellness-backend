@@ -225,12 +225,14 @@ export class RecipeExecutionService {
 
   /**
    * Pause recipe execution
-   * Accepts remainingTime from frontend to sync timer
+   * Validates and saves remainingTime and reason
    */
   async pauseExecution(
     taskId: string,
     dto: PauseExecutionDto = {},
   ): Promise<RecipeExecutionStatusDto> {
+    this.logger.log(`Pausing recipe execution for task: ${taskId}`);
+
     const execution = await this.getExecutionByTaskId(taskId);
 
     if (execution.status !== RecipeExecutionStatus.IN_PROGRESS) {
@@ -239,11 +241,11 @@ export class RecipeExecutionService {
       );
     }
 
-    // Get current step execution
     if (!execution.currentStepId) {
       throw new BadRequestException('No current step to pause');
     }
 
+    // Get current step execution
     const currentStepExecution = await this.stepExecutionRepository.findOne({
       where: {
         executionId: execution.id,
@@ -255,7 +257,7 @@ export class RecipeExecutionService {
       throw new NotFoundException('Current step execution not found');
     }
 
-    // Get recipe to access step duration
+    // Get recipe and current step details
     const recipe = await this.recipesService.findOne(execution.recipeId, false);
     const recipeStep = recipe.steps?.find(
       (s) => s.id === currentStepExecution.recipeStepId,
@@ -265,11 +267,15 @@ export class RecipeExecutionService {
       throw new NotFoundException('Recipe step not found');
     }
 
-    const stepDuration = recipeStep.duration; // Original step duration in minutes
+    const stepDuration = recipeStep.duration; // Step duration in minutes
 
     // Validate remainingTime if provided
     if (dto.remainingTime !== undefined && dto.remainingTime !== null) {
-      // Check if remainingTime is greater than stepDuration (invalid)
+      if (dto.remainingTime < 0) {
+        throw new BadRequestException(
+          'Remaining time cannot be negative',
+        );
+      }
       if (dto.remainingTime > stepDuration) {
         throw new BadRequestException(
           `Invalid remaining time: ${dto.remainingTime} minutes. Remaining time cannot be greater than step duration (${stepDuration} minutes).`,
@@ -277,69 +283,68 @@ export class RecipeExecutionService {
       }
     }
 
-    // Calculate elapsed time - prefer remainingTime from frontend if provided
+    // Calculate elapsed time for current step
     let calculatedElapsedTime: number;
+    let remainingTime: number;
 
     if (dto.remainingTime !== undefined && dto.remainingTime !== null) {
-      // Use remaining time from frontend (more accurate)
-      // elapsedTime = stepDuration - remainingTime
-      calculatedElapsedTime = Math.max(0, stepDuration - dto.remainingTime);
+      // Use remainingTime from frontend
+      remainingTime = dto.remainingTime;
+      calculatedElapsedTime = Math.max(0, stepDuration - remainingTime);
       this.logger.log(
-        `pauseExecution - Using remainingTime from request: ${dto.remainingTime}, calculated elapsedTime: ${calculatedElapsedTime}`,
+        `Pause: Using remainingTime from request: ${remainingTime} min, calculated elapsedTime: ${calculatedElapsedTime} min`,
       );
     } else {
-      // Fallback: Calculate from timestamps
-      if (currentStepExecution.startedAt) {
-        const now = new Date();
-        const referenceTime =
-          currentStepExecution.resumedAt || currentStepExecution.startedAt;
+      // Calculate from timestamps
+      const now = new Date();
+      const referenceTime =
+        currentStepExecution.resumedAt || currentStepExecution.startedAt;
+
+      if (referenceTime) {
         const additionalElapsedTime = Math.floor(
           (now.getTime() - referenceTime.getTime()) / (1000 * 60),
         );
         calculatedElapsedTime =
           (currentStepExecution.stepElapsedTime || 0) + additionalElapsedTime;
+        remainingTime = Math.max(0, stepDuration - calculatedElapsedTime);
         this.logger.log(
-          `pauseExecution - Calculated elapsedTime from timestamps: ${calculatedElapsedTime}`,
+          `Pause: Calculated from timestamps - elapsedTime: ${calculatedElapsedTime} min, remainingTime: ${remainingTime} min`,
         );
       } else {
         calculatedElapsedTime = currentStepExecution.stepElapsedTime || 0;
+        remainingTime = Math.max(0, stepDuration - calculatedElapsedTime);
       }
     }
 
     // Update step elapsed time
     const previousElapsedTime = currentStepExecution.stepElapsedTime || 0;
-    const additionalTime = calculatedElapsedTime - previousElapsedTime;
+    const additionalTime = Math.max(0, calculatedElapsedTime - previousElapsedTime);
 
     currentStepExecution.stepElapsedTime = calculatedElapsedTime;
+    currentStepExecution.status = StepExecutionStatus.PAUSED;
+    currentStepExecution.pausedAt = new Date();
 
-    // Add additional time to total execution elapsed time
+    // Update total execution elapsed time
     if (additionalTime > 0) {
       execution.totalElapsedTime =
         (execution.totalElapsedTime || 0) + additionalTime;
     }
 
-    // Pause execution and current step
+    // Save pause information
     execution.status = RecipeExecutionStatus.PAUSED;
     execution.pausedAt = new Date();
-    
-    // Save pause reason and remaining time
-    if (dto.reason !== undefined) {
-      execution.pauseReason = dto.reason;
-    }
-    if (dto.remainingTime !== undefined && dto.remainingTime !== null) {
-      execution.remainingTimeAtPause = dto.remainingTime;
-    } else {
-      // Calculate remaining time from elapsed time
-      const calculatedRemainingTime = Math.max(0, stepDuration - calculatedElapsedTime);
-      execution.remainingTimeAtPause = calculatedRemainingTime;
-    }
+    execution.pauseReason = dto.reason || undefined;
+    execution.remainingTimeAtPause = remainingTime;
 
-    currentStepExecution.status = StepExecutionStatus.PAUSED;
-    currentStepExecution.pausedAt = new Date();
-
+    // Save to database
     await this.executionRepository.save(execution);
     await this.stepExecutionRepository.save(currentStepExecution);
 
+    this.logger.log(
+      `Paused execution. Step elapsed: ${calculatedElapsedTime} min, Remaining: ${remainingTime} min, Reason: ${dto.reason || 'N/A'}`,
+    );
+
+    // Get all step executions for response
     const stepExecutions = await this.stepExecutionRepository.find({
       where: { executionId: execution.id },
       order: { stepOrder: 'ASC' },
@@ -350,12 +355,14 @@ export class RecipeExecutionService {
 
   /**
    * Resume recipe execution
-   * Accepts optional remainingTime from frontend to sync timer
+   * Clears pause information and returns remainingTimeForTask
    */
   async resumeExecution(
     taskId: string,
     dto: ResumeExecutionDto = {},
   ): Promise<RecipeExecutionStatusDto> {
+    this.logger.log(`Resuming recipe execution for task: ${taskId}`);
+
     const execution = await this.getExecutionByTaskId(taskId);
 
     if (execution.status !== RecipeExecutionStatus.PAUSED) {
@@ -364,11 +371,11 @@ export class RecipeExecutionService {
       );
     }
 
-    // Get current step execution
     if (!execution.currentStepId) {
       throw new BadRequestException('No current step to resume');
     }
 
+    // Get current step execution
     const currentStepExecution = await this.stepExecutionRepository.findOne({
       where: {
         executionId: execution.id,
@@ -380,7 +387,7 @@ export class RecipeExecutionService {
       throw new NotFoundException('Current step execution not found');
     }
 
-    // Get recipe to access step duration
+    // Get recipe and current step details
     const recipe = await this.recipesService.findOne(execution.recipeId, false);
     const recipeStep = recipe.steps?.find(
       (s) => s.id === currentStepExecution.recipeStepId,
@@ -390,53 +397,49 @@ export class RecipeExecutionService {
       throw new NotFoundException('Recipe step not found');
     }
 
-    const stepDuration = recipeStep.duration; // Original step duration in minutes
+    const stepDuration = recipeStep.duration;
 
-    // If remainingTime provided, update elapsed time accordingly
+    // If remainingTime provided, sync elapsed time
     if (dto.remainingTime !== undefined && dto.remainingTime !== null) {
-      // Calculate elapsed time from remaining time
-      const calculatedElapsedTime = Math.max(
-        0,
-        stepDuration - dto.remainingTime,
-      );
-      
-      // Update step elapsed time if different (frontend might have more accurate timer)
-      if (
-        Math.abs(calculatedElapsedTime - (currentStepExecution.stepElapsedTime || 0)) > 0
-      ) {
-        const previousElapsedTime = currentStepExecution.stepElapsedTime || 0;
-        const timeDifference = calculatedElapsedTime - previousElapsedTime;
-        
+      if (dto.remainingTime < 0 || dto.remainingTime > stepDuration) {
+        throw new BadRequestException(
+          `Invalid remaining time: ${dto.remainingTime} minutes. Must be between 0 and ${stepDuration} minutes.`,
+        );
+      }
+
+      const calculatedElapsedTime = Math.max(0, stepDuration - dto.remainingTime);
+      const previousElapsedTime = currentStepExecution.stepElapsedTime || 0;
+      const timeDifference = calculatedElapsedTime - previousElapsedTime;
+
+      if (Math.abs(timeDifference) > 0) {
         currentStepExecution.stepElapsedTime = calculatedElapsedTime;
-        
-        // Adjust total elapsed time if needed
-        if (timeDifference !== 0) {
-          execution.totalElapsedTime =
-            (execution.totalElapsedTime || 0) + timeDifference;
-        }
-        
+        execution.totalElapsedTime =
+          (execution.totalElapsedTime || 0) + timeDifference;
         this.logger.log(
-          `resumeExecution - Updated elapsedTime from remainingTime: ${dto.remainingTime}, new elapsedTime: ${calculatedElapsedTime}`,
+          `Resume: Synced elapsedTime from remainingTime: ${dto.remainingTime} min, new elapsedTime: ${calculatedElapsedTime} min`,
         );
       }
     }
 
-    // Resume execution and current step
-    execution.status = RecipeExecutionStatus.IN_PROGRESS;
+    // Resume execution
     const resumeTime = new Date();
+    execution.status = RecipeExecutionStatus.IN_PROGRESS;
     execution.resumedAt = resumeTime;
-    // Clear pause reason and remaining time at pause when resuming
-    execution.pauseReason = undefined;
-    execution.remainingTimeAtPause = undefined;
+    execution.pauseReason = undefined; // Clear pause reason
+    execution.remainingTimeAtPause = undefined; // Clear remaining time at pause
 
+    // Resume current step
     currentStepExecution.status = StepExecutionStatus.IN_PROGRESS;
-    currentStepExecution.resumedAt = resumeTime; // Track resume time for this step
-    // Keep pausedAt for tracking - don't clear it
-    // Don't update startedAt - keep original start time for accurate duration tracking
+    currentStepExecution.resumedAt = resumeTime;
+    // Keep pausedAt for tracking history
 
+    // Save to database
     await this.executionRepository.save(execution);
     await this.stepExecutionRepository.save(currentStepExecution);
 
+    this.logger.log(`Resumed execution at ${resumeTime.toISOString()}`);
+
+    // Get all step executions for response
     const stepExecutions = await this.stepExecutionRepository.find({
       where: { executionId: execution.id },
       order: { stepOrder: 'ASC' },
@@ -843,44 +846,53 @@ export class RecipeExecutionService {
     );
 
     // Calculate remaining time for entire task/recipe
-    // Sum of remaining times for all incomplete steps
-    let remainingTimeForTask: number | undefined;
-    
+    // This is the sum of remaining times for all incomplete steps
+    let remainingTimeForTask: number = 0;
+
+    // Get all incomplete steps
     const incompleteSteps = stepExecutions.filter(
-      (se) => se.status !== StepExecutionStatus.COMPLETED
+      (se) => se.status !== StepExecutionStatus.COMPLETED,
     );
-    
-    if (incompleteSteps.length > 0) {
-      let totalRemainingTime = 0;
-      
-      for (const stepExec of incompleteSteps) {
-        const step = recipe.steps?.find((s) => s.id === stepExec.recipeStepId);
-        if (step) {
-          if (stepExec.recipeStepId === execution.currentStepId) {
-            // Current step - use saved remainingTimeAtPause if paused, otherwise calculate
-            if (execution.status === RecipeExecutionStatus.PAUSED && 
-                execution.remainingTimeAtPause !== undefined && 
-                execution.remainingTimeAtPause !== null) {
-              totalRemainingTime += execution.remainingTimeAtPause;
-            } else if (currentStep?.remainingTime !== undefined) {
-              totalRemainingTime += currentStep.remainingTime;
-            } else {
-              // Fallback: calculate from elapsed time
-              const stepElapsed = stepExec.stepElapsedTime || 0;
-              const stepRemaining = Math.max(0, step.duration - stepElapsed);
-              totalRemainingTime += stepRemaining;
-            }
+
+    for (const stepExec of incompleteSteps) {
+      const step = recipe.steps?.find((s) => s.id === stepExec.recipeStepId);
+      if (!step) continue;
+
+      if (stepExec.recipeStepId === execution.currentStepId) {
+        // Current step - calculate remaining time
+        if (
+          execution.status === RecipeExecutionStatus.PAUSED &&
+          execution.remainingTimeAtPause !== undefined &&
+          execution.remainingTimeAtPause !== null
+        ) {
+          // Use saved remaining time from pause
+          remainingTimeForTask += execution.remainingTimeAtPause;
+        } else if (currentStep?.remainingTime !== undefined) {
+          // Use calculated remaining time from currentStep
+          remainingTimeForTask += currentStep.remainingTime;
+        } else {
+          // Fallback: calculate from elapsed time
+          const stepElapsed = stepExec.stepElapsedTime || 0;
+          // If step is in progress, add time since last start/resume
+          if (
+            stepExec.status === StepExecutionStatus.IN_PROGRESS &&
+            stepExec.startedAt
+          ) {
+            const now = new Date();
+            const referenceTime = stepExec.resumedAt || stepExec.startedAt;
+            const additionalTime = Math.floor(
+              (now.getTime() - referenceTime.getTime()) / (1000 * 60),
+            );
+            const totalElapsed = stepElapsed + additionalTime;
+            remainingTimeForTask += Math.max(0, step.duration - totalElapsed);
           } else {
-            // Future steps - use full duration (not started yet)
-            totalRemainingTime += step.duration;
+            remainingTimeForTask += Math.max(0, step.duration - stepElapsed);
           }
         }
+      } else {
+        // Future steps - use full duration (not started yet)
+        remainingTimeForTask += step.duration;
       }
-      
-      remainingTimeForTask = totalRemainingTime;
-    } else {
-      // All steps completed
-      remainingTimeForTask = 0;
     }
 
     return {
