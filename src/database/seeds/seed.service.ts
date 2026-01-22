@@ -1,12 +1,13 @@
 // src/database/seed/seed.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { User } from '../../modules/users/user.entity';
 import { Role } from '../../modules/roles/entities/role.entity';
 import { Permission } from '../../modules/permissions/entities/permission.entity';
 import { RolePermission } from '../../modules/role-permissions/entities/role-permission.entity';
 import { TaskPhaseEntity } from '../../modules/tasks/entities/task-phase.entity';
+import { TaskTemplateEntity } from '../../modules/tasks/entities/task-template.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { TaskStatus } from '../../common/enums/task.enum';
 import * as bcrypt from 'bcrypt';
@@ -26,22 +27,31 @@ export class SeedService {
     private readonly rolePermissionRepository: Repository<RolePermission>,
     @InjectRepository(TaskPhaseEntity)
     private readonly phaseRepository: Repository<TaskPhaseEntity>,
+    @InjectRepository(TaskTemplateEntity)
+    private readonly templateRepository: Repository<TaskTemplateEntity>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async run() {
     this.logger.log('Starting database seeding...');
 
-    // 1. Create all permissions
+    // 1. Create task_templates table if it doesn't exist
+    await this.createTaskTemplatesTable();
+
+    // 2. Create all permissions
     const permissions = await this.createPermissions();
 
-    // 2. Create Super Admin role
+    // 3. Create Super Admin role
     const superAdminRole = await this.createSuperAdminRole(permissions);
 
-    // 3. Create Super Admin user
+    // 4. Create Super Admin user
     await this.createSuperAdminUser(superAdminRole);
 
-    // 4. Create initial task phases
+    // 5. Create initial task phases
     await this.createInitialPhases();
+
+    // 6. Create initial task templates
+    await this.createInitialTemplates();
 
     this.logger.log('✅ Database seeding completed successfully!');
   }
@@ -349,5 +359,140 @@ export class SeedService {
     }
 
     this.logger.log('✅ Initial task phases created/verified successfully');
+  }
+
+  /**
+   * Create task_templates table if it doesn't exist
+   */
+  private async createTaskTemplatesTable(): Promise<void> {
+    this.logger.log('Checking/Creating task_templates table...');
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+
+    try {
+      // Check if table exists
+      const tableExists = await queryRunner.hasTable('task_templates');
+
+      if (!tableExists) {
+        this.logger.log('Creating task_templates table...');
+
+        await queryRunner.query(`
+          CREATE TABLE \`task_templates\` (
+            \`id\` CHAR(36) PRIMARY KEY,
+            \`name\` VARCHAR(255) NOT NULL,
+            \`description\` TEXT NULL,
+            \`is_default\` BOOLEAN DEFAULT FALSE,
+            \`assigned_phase_id\` CHAR(36) NULL,
+            \`mandatory_fields\` JSON NOT NULL,
+            \`optional_fields\` JSON NULL,
+            \`optional_field_config\` JSON NULL,
+            \`created_at\` DATETIME DEFAULT CURRENT_TIMESTAMP,
+            \`updated_at\` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            \`created_by\` CHAR(36) NULL,
+            CONSTRAINT \`fk_template_phase\` FOREIGN KEY (\`assigned_phase_id\`) REFERENCES \`task_phases\` (\`id\`) ON DELETE SET NULL,
+            CONSTRAINT \`fk_template_created_by\` FOREIGN KEY (\`created_by\`) REFERENCES \`users\` (\`id\`) ON DELETE SET NULL,
+            INDEX \`idx_template_phase\` (\`assigned_phase_id\`),
+            INDEX \`idx_template_default\` (\`is_default\`)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+
+        this.logger.log('✅ Created task_templates table');
+      } else {
+        this.logger.log('⚠️  task_templates table already exists');
+      }
+    } catch (error: any) {
+      // If table already exists or foreign key constraints fail (tables don't exist yet), that's okay
+      if (error.code === 'ER_TABLE_EXISTS_ERROR' || error.code === 'ER_NO_SUCH_TABLE') {
+        this.logger.log('⚠️  Table creation skipped (may exist or dependencies not ready)');
+      } else {
+        this.logger.warn(`⚠️  Could not create task_templates table: ${error.message}`);
+        // Don't throw - let TypeORM handle table creation if needed
+      }
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Create initial task templates (default template and Filling & Packing template)
+   */
+  private async createInitialTemplates(): Promise<void> {
+    this.logger.log('Creating initial task templates...');
+
+    // 1. Create default template
+    let defaultTemplate = await this.templateRepository.findOne({
+      where: { isDefault: true },
+    });
+
+    if (!defaultTemplate) {
+      defaultTemplate = this.templateRepository.create({
+        name: 'Default Task Template',
+        description: 'Default template for all phases',
+        isDefault: true,
+        assignedPhaseId: undefined,
+        mandatoryFields: {
+          taskName: true,
+          taskDescription: true,
+          assignTo: true,
+          priority: true,
+          startDate: true,
+          endDate: true,
+          status: true,
+        },
+        optionalFields: [],
+        optionalFieldConfig: {},
+      });
+
+      defaultTemplate = await this.templateRepository.save(defaultTemplate);
+      this.logger.log('✅ Created default task template');
+    } else {
+      this.logger.log('⚠️  Default template already exists');
+    }
+
+    // 2. Create Filling & Packing template (if phase exists)
+    const fillingPackingPhase = await this.phaseRepository.findOne({
+      where: { name: 'Filling & Packing' },
+    });
+
+    if (fillingPackingPhase) {
+      let fillingPackingTemplate = await this.templateRepository.findOne({
+        where: { assignedPhaseId: fillingPackingPhase.id },
+      });
+
+      if (!fillingPackingTemplate) {
+        fillingPackingTemplate = this.templateRepository.create({
+          name: 'Filling & Packing Template',
+          description: 'Template for filling and packing phase with customer details',
+          isDefault: false,
+          assignedPhaseId: fillingPackingPhase.id,
+          mandatoryFields: {
+            taskName: true,
+            taskDescription: true,
+            assignTo: true,
+            priority: true,
+            startDate: true,
+            endDate: true,
+            status: true,
+          },
+          optionalFields: ['orderNumber', 'customerName', 'customerAddress', 'customerContact'],
+          optionalFieldConfig: {
+            orderNumber: { inputType: 'text' },
+            customerName: { inputType: 'text' },
+            customerAddress: { inputType: 'text' },
+            customerContact: { inputType: 'text' },
+          },
+        });
+
+        fillingPackingTemplate = await this.templateRepository.save(fillingPackingTemplate);
+        this.logger.log('✅ Created Filling & Packing template');
+      } else {
+        this.logger.log('⚠️  Filling & Packing template already exists');
+      }
+    } else {
+      this.logger.log('⚠️  Filling & Packing phase not found, skipping template creation');
+    }
+
+    this.logger.log('✅ Initial task templates created/verified successfully');
   }
 }
