@@ -70,6 +70,13 @@ export class TaskRecipeExecutionEntity {
   @Column({ name: 'total_elapsed_time', type: 'int', default: 0 })
   totalElapsedTime: number;
 
+  // Pause information
+  @Column({ name: 'pause_reason', type: 'text', nullable: true })
+  pauseReason?: string; // Reason for pausing
+
+  @Column({ name: 'remaining_time_at_pause', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  remainingTimeAtPause?: number; // Remaining time in minutes when paused
+
   @OneToMany(
     () => TaskRecipeStepExecutionEntity,
     (stepExecution) => stepExecution.execution,

@@ -108,10 +108,13 @@ export class RecipeExecutionStatusDto {
   elapsedTime: number; // Total elapsed time in minutes (accumulated)
   currentStepElapsedTime?: number; // Current step elapsed time in minutes (for active steps)
   currentStepRemainingTime?: number; // Remaining time for current step in minutes
+  remainingTimeForTask?: number; // Remaining time for the entire task/recipe execution (in minutes)
   startedAt?: Date;
   pausedAt?: Date;
   resumedAt?: Date;
   completedAt?: Date;
+  pauseReason?: string; // Reason for pausing (if paused)
+  remainingTimeAtPause?: number; // Remaining time when paused (in minutes)
   recipe?: RecipeResponseDto;
   stepExecutions: StepExecutionStatusDto[];
 }

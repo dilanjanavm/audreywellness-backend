@@ -267,6 +267,16 @@ export class RecipeExecutionService {
 
     const stepDuration = recipeStep.duration; // Original step duration in minutes
 
+    // Validate remainingTime if provided
+    if (dto.remainingTime !== undefined && dto.remainingTime !== null) {
+      // Check if remainingTime is greater than stepDuration (invalid)
+      if (dto.remainingTime > stepDuration) {
+        throw new BadRequestException(
+          `Invalid remaining time: ${dto.remainingTime} minutes. Remaining time cannot be greater than step duration (${stepDuration} minutes).`,
+        );
+      }
+    }
+
     // Calculate elapsed time - prefer remainingTime from frontend if provided
     let calculatedElapsedTime: number;
 
@@ -311,6 +321,18 @@ export class RecipeExecutionService {
     // Pause execution and current step
     execution.status = RecipeExecutionStatus.PAUSED;
     execution.pausedAt = new Date();
+    
+    // Save pause reason and remaining time
+    if (dto.reason !== undefined) {
+      execution.pauseReason = dto.reason;
+    }
+    if (dto.remainingTime !== undefined && dto.remainingTime !== null) {
+      execution.remainingTimeAtPause = dto.remainingTime;
+    } else {
+      // Calculate remaining time from elapsed time
+      const calculatedRemainingTime = Math.max(0, stepDuration - calculatedElapsedTime);
+      execution.remainingTimeAtPause = calculatedRemainingTime;
+    }
 
     currentStepExecution.status = StepExecutionStatus.PAUSED;
     currentStepExecution.pausedAt = new Date();
@@ -403,6 +425,9 @@ export class RecipeExecutionService {
     execution.status = RecipeExecutionStatus.IN_PROGRESS;
     const resumeTime = new Date();
     execution.resumedAt = resumeTime;
+    // Clear pause reason and remaining time at pause when resuming
+    execution.pauseReason = undefined;
+    execution.remainingTimeAtPause = undefined;
 
     currentStepExecution.status = StepExecutionStatus.IN_PROGRESS;
     currentStepExecution.resumedAt = resumeTime; // Track resume time for this step
@@ -817,6 +842,47 @@ export class RecipeExecutionService {
       },
     );
 
+    // Calculate remaining time for entire task/recipe
+    // Sum of remaining times for all incomplete steps
+    let remainingTimeForTask: number | undefined;
+    
+    const incompleteSteps = stepExecutions.filter(
+      (se) => se.status !== StepExecutionStatus.COMPLETED
+    );
+    
+    if (incompleteSteps.length > 0) {
+      let totalRemainingTime = 0;
+      
+      for (const stepExec of incompleteSteps) {
+        const step = recipe.steps?.find((s) => s.id === stepExec.recipeStepId);
+        if (step) {
+          if (stepExec.recipeStepId === execution.currentStepId) {
+            // Current step - use saved remainingTimeAtPause if paused, otherwise calculate
+            if (execution.status === RecipeExecutionStatus.PAUSED && 
+                execution.remainingTimeAtPause !== undefined && 
+                execution.remainingTimeAtPause !== null) {
+              totalRemainingTime += execution.remainingTimeAtPause;
+            } else if (currentStep?.remainingTime !== undefined) {
+              totalRemainingTime += currentStep.remainingTime;
+            } else {
+              // Fallback: calculate from elapsed time
+              const stepElapsed = stepExec.stepElapsedTime || 0;
+              const stepRemaining = Math.max(0, step.duration - stepElapsed);
+              totalRemainingTime += stepRemaining;
+            }
+          } else {
+            // Future steps - use full duration (not started yet)
+            totalRemainingTime += step.duration;
+          }
+        }
+      }
+      
+      remainingTimeForTask = totalRemainingTime;
+    } else {
+      // All steps completed
+      remainingTimeForTask = 0;
+    }
+
     return {
       id: execution.id,
       executionId: execution.id,
@@ -828,10 +894,13 @@ export class RecipeExecutionService {
       elapsedTime: execution.totalElapsedTime,
       currentStepElapsedTime,
       currentStepRemainingTime: currentStep?.remainingTime,
+      remainingTimeForTask,
       startedAt: execution.startedAt,
       pausedAt: execution.pausedAt,
       resumedAt: execution.resumedAt,
       completedAt: execution.completedAt,
+      pauseReason: execution.pauseReason,
+      remainingTimeAtPause: execution.remainingTimeAtPause,
       recipe,
       stepExecutions: stepExecutionDtos,
     };
