@@ -53,11 +53,11 @@ export class TaskTemplateEntity {
   @Column({ name: 'mandatory_fields', type: 'json' })
   mandatoryFields: MandatoryFields;
 
-  @Column({ name: 'optional_fields', type: 'json', default: '[]' })
-  optionalFields: string[];
+  @Column({ name: 'optional_fields', type: 'json', nullable: true })
+  optionalFields?: string[];
 
-  @Column({ name: 'optional_field_config', type: 'json', default: '{}' })
-  optionalFieldConfig: OptionalFieldConfig;
+  @Column({ name: 'optional_field_config', type: 'json', nullable: true })
+  optionalFieldConfig?: OptionalFieldConfig;
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'created_by' })

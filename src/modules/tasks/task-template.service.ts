@@ -209,7 +209,7 @@ export class TaskTemplateService {
 
     // Validate optional fields configuration if provided
     if (dto.optionalFields && dto.optionalFields.length > 0) {
-      const config = dto.optionalFieldConfig || template.optionalFieldConfig;
+      const config = dto.optionalFieldConfig || template.optionalFieldConfig || {};
       // Convert OptionalFieldConfig to the expected format
       const configRecord: Record<string, { inputType: OptionalFieldInputType }> = {};
       for (const [key, value] of Object.entries(config)) {
@@ -386,8 +386,8 @@ export class TaskTemplateService {
       isDefault: template.isDefault,
       assignedPhaseId: template.assignedPhaseId,
       mandatoryFields: template.mandatoryFields,
-      optionalFields: template.optionalFields,
-      optionalFieldConfig: template.optionalFieldConfig,
+      optionalFields: template.optionalFields || [],
+      optionalFieldConfig: template.optionalFieldConfig || {},
       createdAt: template.createdAt,
       updatedAt: template.updatedAt,
       createdBy: template.createdBy,
