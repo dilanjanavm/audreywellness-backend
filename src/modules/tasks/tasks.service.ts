@@ -762,6 +762,173 @@ export class TasksService {
     return this.mapTaskToResponseDto(saved);
   }
 
+  /**
+   * Get task template for a specific phase
+   * Returns required and optional fields based on phase type
+   */
+  async getTaskTemplate(phaseId: string): Promise<{
+    phaseId: string;
+    phaseName: string;
+    isFillingAndPacking: boolean;
+    requiredFields: string[];
+    optionalFields: string[];
+    fieldDescriptions: Record<string, { type: string; required: boolean; description: string; validation?: string }>;
+    exampleRequest: any;
+  }> {
+    this.logger.log(`getTaskTemplate - Getting template for phase: ${phaseId}`);
+    
+    const phase = await this.findPhaseOrThrow(phaseId);
+    const isFillingAndPacking = phase.name.toLowerCase() === 'filling & packing';
+
+    // Base required fields for all phases
+    const baseRequiredFields = ['task', 'phaseId', 'status'];
+    
+    // Base optional fields for all phases
+    const baseOptionalFields = [
+      'taskId',
+      'description',
+      'priority',
+      'dueDate',
+      'assignedUserId',
+      'costingId',
+      'batchSize',
+      'rawMaterials',
+      'assignee',
+      'comments',
+      'views',
+      'order',
+      'updatedBy',
+    ];
+
+    // Filling & Packing specific required fields
+    const fillingPackingRequiredFields = [
+      'orderNumber',
+      'customerName',
+      'customerMobile',
+      'customerAddress',
+    ];
+
+    const requiredFields = isFillingAndPacking
+      ? [...baseRequiredFields, ...fillingPackingRequiredFields]
+      : baseRequiredFields;
+
+    const optionalFields = isFillingAndPacking
+      ? baseOptionalFields
+      : [...baseOptionalFields, ...fillingPackingRequiredFields];
+
+    // Field descriptions
+    const fieldDescriptions: Record<string, { type: string; required: boolean; description: string; validation?: string }> = {
+      task: {
+        type: 'string',
+        required: true,
+        description: 'Task title/name',
+      },
+      phaseId: {
+        type: 'string (UUID)',
+        required: true,
+        description: 'Phase ID where the task belongs',
+      },
+      status: {
+        type: 'string (enum)',
+        required: true,
+        description: `Task status. Allowed values: ${phase.statuses.join(', ')}`,
+      },
+      taskId: {
+        type: 'string',
+        required: false,
+        description: 'Custom task ID. Auto-generated if not provided',
+      },
+      description: {
+        type: 'string',
+        required: false,
+        description: 'Task description',
+      },
+      priority: {
+        type: 'string (enum)',
+        required: false,
+        description: 'Task priority: low, medium, high, urgent',
+      },
+      dueDate: {
+        type: 'string (ISO date)',
+        required: false,
+        description: 'Due date in ISO format',
+      },
+      assignedUserId: {
+        type: 'string (UUID)',
+        required: false,
+        description: 'User ID to assign the task to',
+      },
+      costingId: {
+        type: 'string (UUID)',
+        required: false,
+        description: 'Costing/Product ID to associate with the task',
+      },
+      batchSize: {
+        type: 'string',
+        required: false,
+        description: 'Batch size identifier (e.g., "batch0_5kg", "batch1kg")',
+      },
+      rawMaterials: {
+        type: 'array',
+        required: false,
+        description: 'Array of raw materials with batch-specific details',
+      },
+      orderNumber: {
+        type: 'string',
+        required: isFillingAndPacking,
+        description: 'Order number for the task',
+        validation: isFillingAndPacking ? 'Required for Filling & Packing phase' : 'Optional for other phases',
+      },
+      customerName: {
+        type: 'string',
+        required: isFillingAndPacking,
+        description: 'Customer name',
+        validation: isFillingAndPacking ? 'Required for Filling & Packing phase' : 'Optional for other phases',
+      },
+      customerMobile: {
+        type: 'string',
+        required: isFillingAndPacking,
+        description: 'Customer mobile number (validated for SMS sending)',
+        validation: isFillingAndPacking
+          ? 'Required for Filling & Packing phase. Must be valid mobile number format (e.g., +94771234567, 0771234567)'
+          : 'Optional for other phases',
+      },
+      customerAddress: {
+        type: 'string',
+        required: isFillingAndPacking,
+        description: 'Customer delivery address',
+        validation: isFillingAndPacking ? 'Required for Filling & Packing phase' : 'Optional for other phases',
+      },
+    };
+
+    // Example request based on phase
+    const exampleRequest: any = {
+      task: 'Example Task Title',
+      phaseId: phase.id,
+      status: phase.statuses[0] || 'pending',
+      description: 'Optional task description',
+      priority: 'medium',
+      dueDate: new Date().toISOString(),
+    };
+
+    if (isFillingAndPacking) {
+      exampleRequest.orderNumber = 'ORD-2024-001';
+      exampleRequest.customerName = 'John Doe';
+      exampleRequest.customerMobile = '+94771234567';
+      exampleRequest.customerAddress = '123 Main Street, Colombo 05, Sri Lanka';
+    }
+
+    return {
+      phaseId: phase.id,
+      phaseName: phase.name,
+      isFillingAndPacking,
+      requiredFields,
+      optionalFields,
+      fieldDescriptions,
+      exampleRequest,
+    };
+  }
+
   getStatusReference() {
     return TASK_STATUS_REFERENCE;
   }

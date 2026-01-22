@@ -211,6 +211,29 @@ export class TasksController {
     }
   }
 
+  /**
+   * Get task template for a specific phase
+   * Returns required and optional fields based on phase type
+   * ⭐ NEW
+   */
+  @Get('template/:phaseId')
+  async getTaskTemplate(@Param('phaseId') phaseId: string) {
+    this.logger.log(`GET /tasks/template/${phaseId} - Request received`);
+    try {
+      const data = await this.tasksService.getTaskTemplate(phaseId);
+      this.logger.log(
+        `GET /tasks/template/${phaseId} - Success: Template retrieved`,
+      );
+      return { data };
+    } catch (error) {
+      this.logger.error(
+        `GET /tasks/template/${phaseId} - Error: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
   // ========== COMMENT ENDPOINTS ==========
   // IMPORTANT: These routes must come BEFORE generic :taskId routes to avoid route conflicts
 
