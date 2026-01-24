@@ -54,8 +54,11 @@ export class TaskEntity {
   @Column({ type: 'enum', enum: TaskPriority, nullable: true })
   priority?: TaskPriority;
 
+  @Column({ name: 'start_date', type: 'datetime', nullable: true })
+  startDate?: Date; // Start date for the task
+
   @Column({ name: 'due_date', type: 'datetime', nullable: true })
-  dueDate?: Date;
+  dueDate?: Date; // End date for the task
 
   // User assignment relation (NEW)
   @ManyToOne(() => User, { nullable: true })
@@ -137,6 +140,13 @@ export class TaskEntity {
 
   @Column({ name: 'customer_address', type: 'text', nullable: true })
   customerAddress?: string; // Customer address for Filling & Packing tasks
+
+  // Courier fields (optional)
+  @Column({ name: 'courier_number', nullable: true })
+  courierNumber?: string; // Courier tracking number
+
+  @Column({ name: 'courier_service', nullable: true })
+  courierService?: string; // Courier service vendor (e.g., DHL, Fedex)
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
