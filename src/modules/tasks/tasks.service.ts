@@ -408,14 +408,17 @@ export class TasksService {
       this.logger.debug(`createTask - Validating status ${dto.status} is allowed in phase`);
       this.ensureStatusInPhase(dto.status, phase);
 
-      // Validate Filling & Packing phase specific requirements
-      const isFillingAndPackingPhase = phase.name.toLowerCase() === 'filling & packing';
-      if (isFillingAndPackingPhase) {
-        this.logger.debug(`createTask - Validating Filling & Packing phase requirements`);
-        this.validateFillingAndPackingRequirements(dto);
+      // Validate mobile number format if provided (for any phase)
+      if (dto.customerMobile && dto.customerMobile.trim() !== '') {
+        this.logger.debug(`createTask - Validating customer mobile number format`);
+        this.validateMobileNumber(dto.customerMobile);
       }
 
-      // Parse due date
+      // Parse start date and due date
+      const startDate = this.parseDate(dto.startDate);
+      if (startDate) {
+        this.logger.debug(`createTask - Start date parsed: ${startDate.toISOString()}`);
+      }
       const dueDate = this.parseDate(dto.dueDate);
       if (dueDate) {
         this.logger.debug(`createTask - Due date parsed: ${dueDate.toISOString()}`);
@@ -479,6 +482,7 @@ export class TasksService {
         description: dto.description,
         status: dto.status,
         priority: dto.priority,
+        startDate,
         dueDate,
         order,
         comments: dto.comments ?? 0,
@@ -495,11 +499,13 @@ export class TasksService {
         assigneeName: assignedUser?.userName || assigneeProfile?.name,
         assigneeRole: assignedUser?.role?.code || assigneeProfile?.role,
         updatedBy: dto.updatedBy,
-        // Filling & Packing phase specific fields
+        // Optional template fields
         orderNumber: dto.orderNumber,
         customerName: dto.customerName,
         customerMobile: dto.customerMobile,
         customerAddress: dto.customerAddress,
+        courierNumber: dto.courierNumber,
+        courierService: dto.courierService,
       });
 
       // Save task
@@ -553,16 +559,9 @@ export class TasksService {
     this.ensureStatusesValid([status]);
     this.ensureStatusInPhase(status, phase);
 
-    // Validate Filling & Packing phase specific requirements if phase is changing or already is Filling & Packing
-    const isFillingAndPackingPhase = phase.name.toLowerCase() === 'filling & packing';
-    if (isFillingAndPackingPhase) {
-      // If updating to Filling & Packing phase, validate required fields
-      const updateDto: CreateTaskDto = {
-        ...task,
-        ...dto,
-        phaseId: phase.id,
-      } as CreateTaskDto;
-      this.validateFillingAndPackingRequirements(updateDto);
+    // Validate mobile number format if provided (for any phase)
+    if (dto.customerMobile !== undefined && dto.customerMobile && dto.customerMobile.trim() !== '') {
+      this.validateMobileNumber(dto.customerMobile);
     }
 
     const shouldMovePhase = phase.id !== task.phaseId;
@@ -602,6 +601,9 @@ export class TasksService {
     }
     if (dto.updatedBy !== undefined) {
       task.updatedBy = dto.updatedBy;
+    }
+    if (dto.startDate !== undefined) {
+      task.startDate = this.parseDate(dto.startDate);
     }
     if (dto.dueDate !== undefined) {
       task.dueDate = this.parseDate(dto.dueDate);
@@ -688,6 +690,20 @@ export class TasksService {
     }
     if (dto.customerAddress !== undefined) {
       task.customerAddress = dto.customerAddress;
+    }
+    // Handle courier fields
+    if (dto.courierNumber !== undefined) {
+      task.courierNumber = dto.courierNumber;
+    }
+    if (dto.courierService !== undefined) {
+      task.courierService = dto.courierService;
+    }
+    // Handle batch size and raw materials
+    if (dto.batchSize !== undefined) {
+      task.batchSize = dto.batchSize;
+    }
+    if (dto.rawMaterials !== undefined) {
+      task.rawMaterials = dto.rawMaterials;
     }
 
     const saved = await this.taskRepository.save(task);
@@ -1307,86 +1323,61 @@ export class TasksService {
         task: task.task,
         description: task.description,
         priority: task.priority,
-        // Filling & Packing phase specific fields
+        startDate: task.startDate,
+        dueDate: task.dueDate,
+        assignee: profile,
+        assignedUserId: task.assignedUserId,
+        assignedUser: task.assignedUser
+          ? {
+              id: task.assignedUser.id,
+              userName: task.assignedUser.userName,
+              email: task.assignedUser.email,
+            }
+          : undefined,
+        costingId: task.costingId,
+        costing: task.costing
+          ? {
+              id: task.costing.id,
+              itemName: task.costing.itemName,
+              itemCode: task.costing.itemCode,
+              version: task.costing.version,
+              isActive: task.costing.isActive,
+            }
+          : undefined,
+        batchSize: task.batchSize,
+        rawMaterials: task.rawMaterials,
+        comments: task.comments,
+        commentList: task.commentList
+          ? task.commentList
+              .sort(
+                (a, b) =>
+                  b.commentedDate.getTime() - a.commentedDate.getTime(),
+              )
+              .map((comment) => this.mapCommentToResponseDto(comment))
+          : undefined,
+        views: task.views,
+        createdAt: task.createdAt,
+        updatedAt: task.updatedAt,
+        updatedBy: task.updatedBy,
+        // Optional template fields
         orderNumber: task.orderNumber,
         customerName: task.customerName,
         customerMobile: task.customerMobile,
         customerAddress: task.customerAddress,
-      dueDate: task.dueDate,
-      assignee: profile,
-      assignedUserId: task.assignedUserId,
-      assignedUser: task.assignedUser
-        ? {
-            id: task.assignedUser.id,
-            userName: task.assignedUser.userName,
-            email: task.assignedUser.email,
-          }
-        : undefined,
-      costingId: task.costingId,
-      costing: task.costing
-        ? {
-            id: task.costing.id,
-            itemName: task.costing.itemName,
-            itemCode: task.costing.itemCode,
-            version: task.costing.version,
-            isActive: task.costing.isActive,
-          }
-        : undefined,
-      batchSize: task.batchSize,
-      rawMaterials: task.rawMaterials,
-      comments: task.comments,
-      commentList: task.commentList
-        ? task.commentList
-            .sort(
-              (a, b) =>
-                b.commentedDate.getTime() - a.commentedDate.getTime(),
-            )
-            .map((comment) => this.mapCommentToResponseDto(comment))
-        : undefined,
-      views: task.views,
-      createdAt: task.createdAt,
-      updatedAt: task.updatedAt,
-      updatedBy: task.updatedBy,
-    };
+        courierNumber: task.courierNumber,
+        courierService: task.courierService,
+      };
   }
 
   /**
-   * Validate Filling & Packing phase specific requirements
-   * For this phase, orderNumber, customerName, customerMobile, and customerAddress are required
+   * Validate mobile number format if provided
    * Mobile number must be valid for SMS sending
+   * This validation is optional - only validates if mobile number is provided
    */
-  private validateFillingAndPackingRequirements(dto: CreateTaskDto): void {
-    this.logger.debug('validateFillingAndPackingRequirements - Validating requirements');
-
-    // Check required fields
-    if (!dto.orderNumber || dto.orderNumber.trim() === '') {
-      throw new BadRequestException(
-        'orderNumber is required for Filling & Packing phase tasks',
-      );
+  private validateMobileNumberIfProvided(mobile?: string): void {
+    if (mobile && mobile.trim() !== '') {
+      this.validateMobileNumber(mobile);
     }
-
-    if (!dto.customerName || dto.customerName.trim() === '') {
-      throw new BadRequestException(
-        'customerName is required for Filling & Packing phase tasks',
-      );
-    }
-
-    if (!dto.customerMobile || dto.customerMobile.trim() === '') {
-      throw new BadRequestException(
-        'customerMobile is required for Filling & Packing phase tasks',
-      );
-    }
-
-    if (!dto.customerAddress || dto.customerAddress.trim() === '') {
-      throw new BadRequestException(
-        'customerAddress is required for Filling & Packing phase tasks',
-      );
-    }
-
-    // Validate mobile number format (for SMS sending)
-    this.validateMobileNumber(dto.customerMobile);
-
-    this.logger.debug('validateFillingAndPackingRequirements - All requirements validated');
   }
 
   /**

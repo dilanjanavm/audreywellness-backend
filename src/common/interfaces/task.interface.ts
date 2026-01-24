@@ -70,26 +70,29 @@ export interface PhaseResponseDto {
 
 export interface TaskBaseDto {
   taskId?: string; // Optional - will be auto-generated if not provided
-  task: string;
-  description?: string;
-  phaseId: string;
-  status: TaskStatus;
-  priority?: TaskPriority;
-  dueDate?: string;
+  task: string; // Task Name (mandatory)
+  description?: string; // Task Description (optional)
+  phaseId: string; // Phase ID (mandatory)
+  status: TaskStatus; // Status (mandatory)
+  priority?: TaskPriority; // Priority (mandatory in template)
+  startDate?: string; // Start Date (mandatory in template) - ISO date string
+  dueDate?: string; // End Date (mandatory in template) - ISO date string
   assignee?: string | null; // Legacy - kept for backward compatibility
-  assignedUserId?: string; // NEW - User UUID
-  costingId?: string; // NEW - Costing UUID
-  batchSize?: string; // NEW - Batch size (e.g., "batch0_5kg")
-  rawMaterials?: TaskRawMaterialDto[]; // NEW - Raw materials array
+  assignedUserId?: string; // Assign To - User UUID (mandatory in template)
+  costingId?: string; // Costed Product - Costing UUID (optional)
+  batchSize?: string; // Batch Size Ratio - Batch size (e.g., "batch0_5kg") (optional)
+  rawMaterials?: TaskRawMaterialDto[]; // Raw materials array (optional)
   comments?: number;
   views?: number;
   order?: number;
   updatedBy?: string;
-  // Filling & Packing Phase Specific Fields (optional for other phases, required for Filling & Packing)
-  orderNumber?: string; // Order number - REQUIRED for Filling & Packing phase
-  customerName?: string; // Customer name - REQUIRED for Filling & Packing phase
-  customerMobile?: string; // Customer mobile number (validated for SMS) - REQUIRED for Filling & Packing phase
-  customerAddress?: string; // Customer address - REQUIRED for Filling & Packing phase
+  // Optional template fields
+  orderNumber?: string; // Order Number (optional)
+  customerName?: string; // Customer Name (optional)
+  customerMobile?: string; // Customer Contact - Mobile number (validated for SMS) (optional)
+  customerAddress?: string; // Customer Address (optional)
+  courierNumber?: string; // Courier Number - Tracking number (optional)
+  courierService?: string; // Courier Service - Vendor selection (e.g., DHL, Fedex) (optional)
 }
 
 export interface CreateTaskDto extends TaskBaseDto {}
@@ -102,38 +105,41 @@ export interface TaskResponseDto {
   phaseId: string;
   status: TaskStatus;
   order: number;
-  task: string;
-  description?: string;
-  priority?: TaskPriority;
-  dueDate?: Date;
+  task: string; // Task Name
+  description?: string; // Task Description
+  priority?: TaskPriority; // Priority
+  startDate?: Date; // Start Date
+  dueDate?: Date; // End Date
   assignee?: TaskAssigneeProfile | null; // Legacy - kept for backward compatibility
-  assignedUserId?: string; // NEW
-  assignedUser?: { // NEW
+  assignedUserId?: string; // Assign To - User UUID
+  assignedUser?: { // Assign To - User object
     id: string;
     userName: string;
     email: string;
   };
-  costingId?: string; // NEW
-  costing?: { // NEW
+  costingId?: string; // Costed Product - Costing UUID
+  costing?: { // Costed Product - Costing object
     id: string;
     itemName: string;
     itemCode: string;
     version: number;
     isActive: boolean;
   };
-  batchSize?: string; // NEW
-  rawMaterials?: TaskRawMaterialDto[]; // NEW
+  batchSize?: string; // Batch Size Ratio
+  rawMaterials?: TaskRawMaterialDto[]; // Raw materials array
   comments: number; // Legacy count field
-  commentList?: TaskCommentResponseDto[]; // NEW - Array of comments
+  commentList?: TaskCommentResponseDto[]; // Array of comments
   views: number;
   createdAt: Date;
   updatedAt: Date;
   updatedBy?: string;
-  // Filling & Packing Phase Specific Fields
-  orderNumber?: string;
-  customerName?: string;
-  customerMobile?: string;
-  customerAddress?: string;
+  // Optional template fields
+  orderNumber?: string; // Order Number
+  customerName?: string; // Customer Name
+  customerMobile?: string; // Customer Contact
+  customerAddress?: string; // Customer Address
+  courierNumber?: string; // Courier Number
+  courierService?: string; // Courier Service
 }
 
 export interface PhaseTaskFilters {
