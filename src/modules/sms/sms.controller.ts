@@ -9,6 +9,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SendlkApiService } from './services/sendlk-api.service';
@@ -30,6 +31,8 @@ import {
 @Controller('sms')
 @UseGuards(JwtAuthGuard)
 export class SmsController {
+  private readonly logger = new Logger(SmsController.name);
+
   constructor(private readonly sendlkApiService: SendlkApiService) {}
 
   /**
@@ -39,11 +42,39 @@ export class SmsController {
   @Post('send')
   @HttpCode(HttpStatus.OK)
   async sendSms(@Body() dto: SendSmsDto): Promise<SendSmsResponse> {
-    return this.sendlkApiService.sendSms(
-      dto.recipient,
-      dto.sender_id,
-      dto.message,
+    this.logger.log(`POST /sms/send - Request received`);
+    this.logger.debug(
+      `POST /sms/send - Recipient: ${dto.recipient}, Sender ID: ${dto.sender_id}, Message length: ${dto.message?.length || 0} characters`,
     );
+
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.sendSms(
+        dto.recipient,
+        dto.sender_id,
+        dto.message,
+      );
+
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `POST /sms/send - Success: SMS sent to ${dto.recipient} in ${duration}ms`,
+      );
+      this.logger.debug(
+        `POST /sms/send - Response: ${JSON.stringify(result)}`,
+      );
+
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `POST /sms/send - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      this.logger.error(
+        `POST /sms/send - Request details: recipient=${dto.recipient}, sender_id=${dto.sender_id}`,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -52,7 +83,23 @@ export class SmsController {
    */
   @Get('messages/:uid')
   async viewSms(@Param('uid') uid: string): Promise<SmsMessageResponse> {
-    return this.sendlkApiService.viewSms(uid);
+    this.logger.log(`GET /sms/messages/${uid} - Request received`);
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.viewSms(uid);
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `GET /sms/messages/${uid} - Success: SMS retrieved in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `GET /sms/messages/${uid} - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -61,7 +108,23 @@ export class SmsController {
    */
   @Get('messages')
   async viewAllSms(): Promise<SmsMessageResponse> {
-    return this.sendlkApiService.viewAllSms();
+    this.logger.log(`GET /sms/messages - Request received`);
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.viewAllSms();
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `GET /sms/messages - Success: Retrieved all SMS messages in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `GET /sms/messages - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -73,7 +136,24 @@ export class SmsController {
   async createContactGroup(
     @Body() dto: CreateContactGroupDto,
   ): Promise<ContactGroupResponse> {
-    return this.sendlkApiService.createContactGroup(dto.name);
+    this.logger.log(`POST /sms/contact-groups - Request received`);
+    this.logger.debug(`POST /sms/contact-groups - Group name: ${dto.name}`);
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.createContactGroup(dto.name);
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `POST /sms/contact-groups - Success: Contact group "${dto.name}" created in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `POST /sms/contact-groups - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -84,7 +164,23 @@ export class SmsController {
   async viewContactGroup(
     @Param('group_id') group_id: string,
   ): Promise<ContactGroupResponse> {
-    return this.sendlkApiService.viewContactGroup(group_id);
+    this.logger.log(`GET /sms/contact-groups/${group_id} - Request received`);
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.viewContactGroup(group_id);
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `GET /sms/contact-groups/${group_id} - Success: Contact group retrieved in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `GET /sms/contact-groups/${group_id} - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -96,7 +192,24 @@ export class SmsController {
     @Param('group_id') group_id: string,
     @Body() dto: UpdateContactGroupDto,
   ): Promise<ContactGroupResponse> {
-    return this.sendlkApiService.updateContactGroup(group_id, dto.name);
+    this.logger.log(`PATCH /sms/contact-groups/${group_id} - Request received`);
+    this.logger.debug(`PATCH /sms/contact-groups/${group_id} - New name: ${dto.name}`);
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.updateContactGroup(group_id, dto.name);
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `PATCH /sms/contact-groups/${group_id} - Success: Contact group updated in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `PATCH /sms/contact-groups/${group_id} - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -107,7 +220,23 @@ export class SmsController {
   async deleteContactGroup(
     @Param('group_id') group_id: string,
   ): Promise<ContactGroupResponse> {
-    return this.sendlkApiService.deleteContactGroup(group_id);
+    this.logger.log(`DELETE /sms/contact-groups/${group_id} - Request received`);
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.deleteContactGroup(group_id);
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `DELETE /sms/contact-groups/${group_id} - Success: Contact group deleted in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `DELETE /sms/contact-groups/${group_id} - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -116,7 +245,23 @@ export class SmsController {
    */
   @Get('contact-groups')
   async viewAllContactGroups(): Promise<ContactGroupResponse> {
-    return this.sendlkApiService.viewAllContactGroups();
+    this.logger.log(`GET /sms/contact-groups - Request received`);
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.viewAllContactGroups();
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `GET /sms/contact-groups - Success: Retrieved all contact groups in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `GET /sms/contact-groups - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -129,12 +274,33 @@ export class SmsController {
     @Param('group_id') group_id: string,
     @Body() dto: CreateContactDto,
   ): Promise<ContactResponse> {
-    return this.sendlkApiService.createContact(
-      group_id,
-      dto.phone,
-      dto.first_name,
-      dto.last_name,
+    this.logger.log(
+      `POST /sms/contact-groups/${group_id}/contacts - Request received`,
     );
+    this.logger.debug(
+      `POST /sms/contact-groups/${group_id}/contacts - Phone: ${dto.phone}, Name: ${dto.first_name} ${dto.last_name || ''}`,
+    );
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.createContact(
+        group_id,
+        dto.phone,
+        dto.first_name,
+        dto.last_name,
+      );
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `POST /sms/contact-groups/${group_id}/contacts - Success: Contact created in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `POST /sms/contact-groups/${group_id}/contacts - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -146,7 +312,25 @@ export class SmsController {
     @Param('group_id') group_id: string,
     @Param('uid') uid: string,
   ): Promise<ContactResponse> {
-    return this.sendlkApiService.viewContact(group_id, uid);
+    this.logger.log(
+      `GET /sms/contact-groups/${group_id}/contacts/${uid} - Request received`,
+    );
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.viewContact(group_id, uid);
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `GET /sms/contact-groups/${group_id}/contacts/${uid} - Success: Contact retrieved in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `GET /sms/contact-groups/${group_id}/contacts/${uid} - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -159,13 +343,34 @@ export class SmsController {
     @Param('uid') uid: string,
     @Body() dto: UpdateContactDto,
   ): Promise<ContactResponse> {
-    return this.sendlkApiService.updateContact(
-      group_id,
-      uid,
-      dto.phone,
-      dto.first_name,
-      dto.last_name,
+    this.logger.log(
+      `PATCH /sms/contact-groups/${group_id}/contacts/${uid} - Request received`,
     );
+    this.logger.debug(
+      `PATCH /sms/contact-groups/${group_id}/contacts/${uid} - Phone: ${dto.phone}, Name: ${dto.first_name} ${dto.last_name || ''}`,
+    );
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.updateContact(
+        group_id,
+        uid,
+        dto.phone,
+        dto.first_name,
+        dto.last_name,
+      );
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `PATCH /sms/contact-groups/${group_id}/contacts/${uid} - Success: Contact updated in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `PATCH /sms/contact-groups/${group_id}/contacts/${uid} - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -177,7 +382,25 @@ export class SmsController {
     @Param('group_id') group_id: string,
     @Param('uid') uid: string,
   ): Promise<ContactResponse> {
-    return this.sendlkApiService.deleteContact(group_id, uid);
+    this.logger.log(
+      `DELETE /sms/contact-groups/${group_id}/contacts/${uid} - Request received`,
+    );
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.deleteContact(group_id, uid);
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `DELETE /sms/contact-groups/${group_id}/contacts/${uid} - Success: Contact deleted in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `DELETE /sms/contact-groups/${group_id}/contacts/${uid} - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -188,7 +411,25 @@ export class SmsController {
   async viewAllContacts(
     @Param('group_id') group_id: string,
   ): Promise<ContactResponse> {
-    return this.sendlkApiService.viewAllContacts(group_id);
+    this.logger.log(
+      `GET /sms/contact-groups/${group_id}/contacts - Request received`,
+    );
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.viewAllContacts(group_id);
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `GET /sms/contact-groups/${group_id}/contacts - Success: Retrieved all contacts in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `GET /sms/contact-groups/${group_id}/contacts - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -197,7 +438,23 @@ export class SmsController {
    */
   @Get('balance')
   async getBalance(): Promise<BalanceResponse> {
-    return this.sendlkApiService.getBalance();
+    this.logger.log(`GET /sms/balance - Request received`);
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.getBalance();
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `GET /sms/balance - Success: Balance retrieved in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `GET /sms/balance - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -206,6 +463,22 @@ export class SmsController {
    */
   @Get('profile')
   async getProfile(): Promise<ProfileResponse> {
-    return this.sendlkApiService.getProfile();
+    this.logger.log(`GET /sms/profile - Request received`);
+    const startTime = Date.now();
+    try {
+      const result = await this.sendlkApiService.getProfile();
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `GET /sms/profile - Success: Profile retrieved in ${duration}ms`,
+      );
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `GET /sms/profile - Failed after ${duration}ms: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 }
