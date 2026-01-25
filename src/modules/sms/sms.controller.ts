@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SendlkApiService } from './services/sendlk-api.service';
@@ -41,23 +42,61 @@ export class SmsController {
    */
   @Post('send')
   @HttpCode(HttpStatus.OK)
-  async sendSms(@Body() dto: SendSmsDto): Promise<SendSmsResponse> {
+  async sendSms(@Body() dto: any): Promise<SendSmsResponse> {
     this.logger.log(`POST /sms/send - Request received`);
     this.logger.debug(
-      `POST /sms/send - Recipient: ${dto.recipient}, Sender ID: ${dto.sender_id}, Message length: ${dto.message?.length || 0} characters`,
+      `POST /sms/send - Raw request body: ${JSON.stringify(dto)}`,
     );
+    this.logger.debug(
+      `POST /sms/send - DTO type: ${typeof dto}, Keys: ${dto ? Object.keys(dto).join(', ') : 'null'}`,
+    );
+
+    // Normalize field names (handle both camelCase and snake_case)
+    const recipient = dto?.recipient || dto?.phone || dto?.phoneNumber || dto?.to;
+    const sender_id = dto?.sender_id || dto?.senderId || dto?.sender || dto?.from;
+    const message = dto?.message || dto?.text || dto?.content || dto?.msg;
+
+    this.logger.debug(
+      `POST /sms/send - Normalized values - Recipient: ${recipient || 'undefined'}, Sender ID: ${sender_id || 'undefined'}, Message length: ${message?.length || 0} characters`,
+    );
+
+    // Validate required fields
+    if (!recipient || (typeof recipient === 'string' && recipient.trim() === '')) {
+      this.logger.error(
+        `POST /sms/send - Validation failed: recipient is missing or empty. Received fields: ${JSON.stringify(Object.keys(dto || {}))}`,
+      );
+      throw new BadRequestException(
+        'recipient (or phone/phoneNumber/to) is required and cannot be empty',
+      );
+    }
+    if (!sender_id || (typeof sender_id === 'string' && sender_id.trim() === '')) {
+      this.logger.error(
+        `POST /sms/send - Validation failed: sender_id is missing or empty. Received fields: ${JSON.stringify(Object.keys(dto || {}))}`,
+      );
+      throw new BadRequestException(
+        'sender_id (or senderId/sender/from) is required and cannot be empty',
+      );
+    }
+    if (!message || (typeof message === 'string' && message.trim() === '')) {
+      this.logger.error(
+        `POST /sms/send - Validation failed: message is missing or empty. Received fields: ${JSON.stringify(Object.keys(dto || {}))}`,
+      );
+      throw new BadRequestException(
+        'message (or text/content/msg) is required and cannot be empty',
+      );
+    }
 
     const startTime = Date.now();
     try {
       const result = await this.sendlkApiService.sendSms(
-        dto.recipient,
-        dto.sender_id,
-        dto.message,
+        String(recipient).trim(),
+        String(sender_id).trim(),
+        String(message).trim(),
       );
 
       const duration = Date.now() - startTime;
       this.logger.log(
-        `POST /sms/send - Success: SMS sent to ${dto.recipient} in ${duration}ms`,
+        `POST /sms/send - Success: SMS sent to ${recipient} in ${duration}ms`,
       );
       this.logger.debug(
         `POST /sms/send - Response: ${JSON.stringify(result)}`,
@@ -71,7 +110,7 @@ export class SmsController {
         error.stack,
       );
       this.logger.error(
-        `POST /sms/send - Request details: recipient=${dto.recipient}, sender_id=${dto.sender_id}`,
+        `POST /sms/send - Request details: recipient=${recipient || 'undefined'}, sender_id=${sender_id || 'undefined'}, original DTO: ${JSON.stringify(dto)}`,
       );
       throw error;
     }
