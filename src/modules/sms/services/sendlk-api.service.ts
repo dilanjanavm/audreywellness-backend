@@ -165,8 +165,14 @@ export class SendlkApiService {
         })}`,
       );
 
+      // If it's already a BadRequestException, re-throw it with the original message
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      // Otherwise, throw a new BadRequestException with appropriate message
       throw new BadRequestException(
-        error.response?.data?.message || 'Failed to send SMS',
+        error.response?.data?.message || error.message || 'Failed to send SMS',
       );
     }
   }
