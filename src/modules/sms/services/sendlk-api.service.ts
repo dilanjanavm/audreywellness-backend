@@ -8,6 +8,7 @@ export class SendlkApiService {
   private readonly apiClient: AxiosInstance;
   private readonly baseUrl: string = 'https://sms.send.lk/api/v3';
   private readonly apiToken: string;
+  private readonly defaultSenderId: string;
 
   constructor(private configService: ConfigService) {
     this.apiToken =
@@ -21,6 +22,12 @@ export class SendlkApiService {
       );
     }
 
+    // Get default sender ID from environment or use a default
+    this.defaultSenderId =
+      this.configService.get<string>('SMS_SENDER_ID') ||
+      this.configService.get<string>('SENDLK_SENDER_ID') ||
+      'AUDREY'; // Default fallback
+
     this.apiClient = axios.create({
       baseURL: this.baseUrl,
       headers: {
@@ -31,6 +38,7 @@ export class SendlkApiService {
     });
 
     this.logger.log(`Send.lk API Service initialized with base URL: ${this.baseUrl}`);
+    this.logger.log(`Default Sender ID: ${this.defaultSenderId}`);
   }
 
   /**
@@ -49,45 +57,83 @@ export class SendlkApiService {
    */
   async sendSms(
     recipient: string,
-    sender_id: string,
     message: string,
+    sender_id?: string,
   ): Promise<any> {
+    // Use default sender ID if not provided
+    const finalSenderId = sender_id || this.defaultSenderId;
     const startTime = Date.now();
+    
+    // Log received parameters
     this.logger.log(
-      `sendSms - Starting SMS send request to ${recipient} from ${sender_id}`,
+      `sendSms - Starting SMS send request`,
     );
     this.logger.debug(
-      `sendSms - Message length: ${message.length} characters, Message preview: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
+      `sendSms - Received parameters - recipient: ${recipient || 'undefined'} (type: ${typeof recipient}), sender_id: ${sender_id || 'undefined'} (will use: ${finalSenderId}), message: ${message ? `${message.length} chars` : 'undefined'} (type: ${typeof message})`,
     );
 
     try {
-      // Validate inputs
-      if (!recipient || recipient.trim() === '') {
-        this.logger.error('sendSms - Validation failed: recipient is empty');
+      // Validate inputs with detailed logging
+      if (!recipient) {
+        this.logger.error('sendSms - Validation failed: recipient is null/undefined');
         throw new BadRequestException('Recipient is required');
       }
-      if (!sender_id || sender_id.trim() === '') {
-        this.logger.error('sendSms - Validation failed: sender_id is empty');
-        throw new BadRequestException('Sender ID is required');
+      if (typeof recipient !== 'string') {
+        this.logger.error(`sendSms - Validation failed: recipient is not a string (type: ${typeof recipient})`);
+        throw new BadRequestException('Recipient must be a string');
       }
-      if (!message || message.trim() === '') {
-        this.logger.error('sendSms - Validation failed: message is empty');
+      if (recipient.trim() === '') {
+        this.logger.error('sendSms - Validation failed: recipient is empty string');
+        throw new BadRequestException('Recipient cannot be empty');
+      }
+
+      // Validate sender_id (use default if not provided)
+      if (sender_id && typeof sender_id !== 'string') {
+        this.logger.error(`sendSms - Validation failed: sender_id is not a string (type: ${typeof sender_id})`);
+        throw new BadRequestException('Sender ID must be a string');
+      }
+      if (sender_id && sender_id.trim() === '') {
+        this.logger.error('sendSms - Validation failed: sender_id is empty string');
+        throw new BadRequestException('Sender ID cannot be empty');
+      }
+
+      if (!sender_id) {
+        this.logger.log(`sendSms - No sender_id provided, using default: ${finalSenderId}`);
+      }
+
+      if (!message) {
+        this.logger.error('sendSms - Validation failed: message is null/undefined');
         throw new BadRequestException('Message is required');
       }
+      if (typeof message !== 'string') {
+        this.logger.error(`sendSms - Validation failed: message is not a string (type: ${typeof message})`);
+        throw new BadRequestException('Message must be a string');
+      }
+      if (message.trim() === '') {
+        this.logger.error('sendSms - Validation failed: message is empty string');
+        throw new BadRequestException('Message cannot be empty');
+      }
+
+      this.logger.log(
+        `sendSms - Validated: Sending SMS to ${recipient} from ${finalSenderId}`,
+      );
+      this.logger.debug(
+        `sendSms - Message length: ${message.length} characters, Message preview: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
+      );
 
       this.logger.debug('sendSms - Input validation passed');
 
       // Prepare request parameters
       const params = new URLSearchParams();
-      params.append('recipient', recipient);
-      params.append('sender_id', sender_id);
-      params.append('message', message);
+      params.append('recipient', recipient.trim());
+      params.append('sender_id', finalSenderId.trim());
+      params.append('message', message.trim());
 
       this.logger.debug(
         `sendSms - Calling Send.lk API: POST ${this.baseUrl}/sms/send`,
       );
       this.logger.debug(
-        `sendSms - Request params: recipient=${recipient}, sender_id=${sender_id}`,
+        `sendSms - Request params: recipient=${recipient}, sender_id=${finalSenderId}`,
       );
 
       // Make API call
@@ -137,7 +183,7 @@ export class SendlkApiService {
           `sendSms - API Error Response: ${JSON.stringify(error.response.data)}`,
         );
         this.logger.error(
-          `sendSms - Request that failed: recipient=${recipient}, sender_id=${sender_id}`,
+          `sendSms - Request that failed: recipient=${recipient}, sender_id=${finalSenderId}`,
         );
       } else if (error.request) {
         // Request was made but no response received
@@ -145,7 +191,7 @@ export class SendlkApiService {
           `sendSms - Network Error after ${duration}ms: No response received from Send.lk API`,
         );
         this.logger.error(
-          `sendSms - Request details: recipient=${recipient}, sender_id=${sender_id}`,
+          `sendSms - Request details: recipient=${recipient}, sender_id=${finalSenderId}`,
         );
       } else {
         // Error in request setup

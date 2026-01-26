@@ -53,11 +53,11 @@ export class SmsController {
 
     // Normalize field names (handle both camelCase and snake_case)
     const recipient = dto?.recipient || dto?.phone || dto?.phoneNumber || dto?.to;
-    const sender_id = dto?.sender_id || dto?.senderId || dto?.sender || dto?.from;
+    const sender_id = dto?.sender_id || dto?.senderId || dto?.sender || dto?.from || undefined; // Optional - will use default
     const message = dto?.message || dto?.text || dto?.content || dto?.msg;
 
     this.logger.debug(
-      `POST /sms/send - Normalized values - Recipient: ${recipient || 'undefined'}, Sender ID: ${sender_id || 'undefined'}, Message length: ${message?.length || 0} characters`,
+      `POST /sms/send - Normalized values - Recipient: ${recipient || 'undefined'}, Sender ID: ${sender_id || 'undefined (will use default)'}, Message length: ${message?.length || 0} characters`,
     );
 
     // Validate required fields
@@ -69,12 +69,10 @@ export class SmsController {
         'recipient (or phone/phoneNumber/to) is required and cannot be empty',
       );
     }
-    if (!sender_id || (typeof sender_id === 'string' && sender_id.trim() === '')) {
-      this.logger.error(
-        `POST /sms/send - Validation failed: sender_id is missing or empty. Received fields: ${JSON.stringify(Object.keys(dto || {}))}`,
-      );
-      throw new BadRequestException(
-        'sender_id (or senderId/sender/from) is required and cannot be empty',
+    // sender_id is optional - will use default from environment
+    if (sender_id && typeof sender_id === 'string' && sender_id.trim() === '') {
+      this.logger.warn(
+        `POST /sms/send - sender_id provided but is empty, will use default`,
       );
     }
     if (!message || (typeof message === 'string' && message.trim() === '')) {
@@ -90,8 +88,8 @@ export class SmsController {
     try {
       const result = await this.sendlkApiService.sendSms(
         String(recipient).trim(),
-        String(sender_id).trim(),
         String(message).trim(),
+        sender_id ? String(sender_id).trim() : undefined,
       );
 
       const duration = Date.now() - startTime;
