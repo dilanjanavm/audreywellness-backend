@@ -6,11 +6,20 @@ import { RecipesService } from './recipes.service';
 import { Recipe } from './entities/recipe.entity';
 import { RecipeStep } from './entities/recipe-step.entity';
 import { RecipeIngredient } from './entities/recipe-ingredient.entity';
+import { RecipePreparationStep } from './entities/recipe-preparation-step.entity';
+import { RecipePreparationQuestion } from './entities/recipe-preparation-question.entity';
 import { ItemEntity } from '../item/entities/item.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Recipe, RecipeStep, RecipeIngredient, ItemEntity]),
+    TypeOrmModule.forFeature([
+      Recipe,
+      RecipeStep,
+      RecipeIngredient,
+      RecipePreparationStep,
+      RecipePreparationQuestion,
+      ItemEntity,
+    ]),
   ],
   controllers: [RecipesController],
   providers: [RecipesService],

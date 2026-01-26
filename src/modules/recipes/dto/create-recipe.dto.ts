@@ -13,6 +13,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RecipeStatus } from '../entities/recipe.entity';
+import { IsBoolean, MaxLength } from 'class-validator';
 
 export class CreateRecipeStepDto {
   @IsNumber()
@@ -48,6 +49,28 @@ export class CreateRecipeIngredientDto {
   @IsString()
   @IsOptional()
   category?: string | null;
+}
+
+export class CreatePreparationQuestionDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  question: string;
+
+  @IsBoolean()
+  hasCheckbox: boolean;
+}
+
+export class CreatePreparationStepDto {
+  @IsNumber()
+  @Min(1)
+  order: number;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreatePreparationQuestionDto)
+  questions: CreatePreparationQuestionDto[];
 }
 
 export class CreateRecipeDto {
@@ -86,5 +109,11 @@ export class CreateRecipeDto {
   @ValidateNested({ each: true })
   @Type(() => CreateRecipeIngredientDto)
   ingredients: CreateRecipeIngredientDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreatePreparationStepDto)
+  @IsOptional()
+  preparationQuestions?: CreatePreparationStepDto[];
 }
 

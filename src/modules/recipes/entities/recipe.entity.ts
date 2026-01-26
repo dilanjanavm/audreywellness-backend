@@ -13,6 +13,7 @@ import {
 import { ItemEntity } from '../../item/entities/item.entity';
 import { RecipeStep } from './recipe-step.entity';
 import { RecipeIngredient } from './recipe-ingredient.entity';
+import { RecipePreparationStep } from './recipe-preparation-step.entity';
 
 export enum RecipeStatus {
   ACTIVE = 'active',
@@ -76,6 +77,12 @@ export class Recipe {
     eager: false,
   })
   ingredients: RecipeIngredient[];
+
+  @OneToMany(() => RecipePreparationStep, (preparationStep) => preparationStep.recipe, {
+    cascade: true,
+    eager: false,
+  })
+  preparationSteps: RecipePreparationStep[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
