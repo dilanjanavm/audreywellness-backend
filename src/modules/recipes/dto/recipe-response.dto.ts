@@ -21,6 +21,22 @@ export class RecipeIngredientResponseDto {
   updatedAt: Date;
 }
 
+export class PreparationQuestionResponseDto {
+  id: string;
+  question: string;
+  hasCheckbox: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export class PreparationStepResponseDto {
+  id: string;
+  order: number;
+  questions: PreparationQuestionResponseDto[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export class RecipeResponseDto {
   id: string;
   name: string;
@@ -35,6 +51,7 @@ export class RecipeResponseDto {
   updatedBy?: string;
   steps: RecipeStepResponseDto[];
   ingredients: RecipeIngredientResponseDto[];
+  preparationQuestions: PreparationStepResponseDto[];
   createdAt: Date;
   updatedAt: Date;
   latestVersions?: RecipeVersionHistoryDto[]; // Latest 3 versions (summary only)

@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RecipeStatus } from '../entities/recipe.entity';
-import { CreateRecipeStepDto, CreateRecipeIngredientDto } from './create-recipe.dto';
+import { CreateRecipeStepDto, CreateRecipeIngredientDto, CreatePreparationStepDto } from './create-recipe.dto';
 
 export class UpdateRecipeDto {
   @IsString()
@@ -44,5 +44,11 @@ export class UpdateRecipeDto {
   @Type(() => CreateRecipeIngredientDto)
   @IsOptional()
   ingredients?: CreateRecipeIngredientDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreatePreparationStepDto)
+  @IsOptional()
+  preparationQuestions?: CreatePreparationStepDto[];
 }
 

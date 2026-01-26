@@ -11,6 +11,8 @@ import { Repository, In } from 'typeorm';
 import { Recipe, RecipeStatus } from './entities/recipe.entity';
 import { RecipeStep } from './entities/recipe-step.entity';
 import { RecipeIngredient } from './entities/recipe-ingredient.entity';
+import { RecipePreparationStep } from './entities/recipe-preparation-step.entity';
+import { RecipePreparationQuestion } from './entities/recipe-preparation-question.entity';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
 import { RecipeQueryDto } from './dto/recipe-query.dto';
@@ -33,6 +35,10 @@ export class RecipesService {
     private readonly stepRepository: Repository<RecipeStep>,
     @InjectRepository(RecipeIngredient)
     private readonly ingredientRepository: Repository<RecipeIngredient>,
+    @InjectRepository(RecipePreparationStep)
+    private readonly preparationStepRepository: Repository<RecipePreparationStep>,
+    @InjectRepository(RecipePreparationQuestion)
+    private readonly preparationQuestionRepository: Repository<RecipePreparationQuestion>,
     @InjectRepository(ItemEntity)
     private readonly itemRepository: Repository<ItemEntity>,
   ) {}
@@ -61,12 +67,19 @@ export class RecipesService {
         );
       }
 
-      // Validate step orders are sequential
-      const stepOrders = createRecipeDto.steps.map((s) => s.order).sort((a, b) => a - b);
-      for (let i = 0; i < stepOrders.length; i++) {
-        if (stepOrders[i] !== i + 1) {
-          throw new BadRequestException(`Step orders must be sequential starting from 1`);
-        }
+      // Validate unified queue order (steps + preparationQuestions)
+      const allOrders: number[] = [];
+      createRecipeDto.steps.forEach((step) => allOrders.push(step.order));
+      if (createRecipeDto.preparationQuestions) {
+        createRecipeDto.preparationQuestions.forEach((prep) => allOrders.push(prep.order));
+      }
+      
+      // Check for duplicate orders
+      const uniqueOrders = new Set(allOrders);
+      if (allOrders.length !== uniqueOrders.size) {
+        throw new BadRequestException(
+          `Order values must be unique across steps and preparationQuestions. Duplicate orders found.`,
+        );
       }
 
       // Get the latest version for this product and batch size
@@ -140,6 +153,27 @@ export class RecipesService {
       );
       await this.ingredientRepository.save(ingredients);
 
+      // Create preparation steps and questions if provided
+      if (createRecipeDto.preparationQuestions && createRecipeDto.preparationQuestions.length > 0) {
+        for (const prepStepDto of createRecipeDto.preparationQuestions) {
+          const preparationStep = this.preparationStepRepository.create({
+            recipeId: savedRecipe.id,
+            order: prepStepDto.order,
+          });
+          const savedPrepStep = await this.preparationStepRepository.save(preparationStep);
+
+          // Create questions for this preparation step
+          const questions = prepStepDto.questions.map((questionDto) =>
+            this.preparationQuestionRepository.create({
+              preparationStepId: savedPrepStep.id,
+              question: questionDto.question,
+              hasCheckbox: questionDto.hasCheckbox,
+            }),
+          );
+          await this.preparationQuestionRepository.save(questions);
+        }
+      }
+
       this.logger.log(`Recipe created successfully: ${savedRecipe.id}, version: ${nextVersion}`);
 
       return this.mapToResponseDto(savedRecipe);
@@ -207,6 +241,8 @@ export class RecipesService {
       queryBuilder
         .leftJoinAndSelect('recipe.steps', 'steps')
         .leftJoinAndSelect('recipe.ingredients', 'ingredients')
+        .leftJoinAndSelect('recipe.preparationSteps', 'preparationSteps')
+        .leftJoinAndSelect('preparationSteps.questions', 'preparationQuestions')
         .orderBy('recipe.createdAt', 'DESC')
         .addOrderBy('recipe.version', 'DESC')
         .skip(skip)
@@ -225,7 +261,7 @@ export class RecipesService {
             },
             order: { version: 'DESC' },
             take: 3,
-            relations: ['steps', 'ingredients'],
+            relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
           });
 
           // Count total versions
@@ -266,7 +302,7 @@ export class RecipesService {
     try {
       const recipe = await this.recipeRepository.findOne({
         where: { id },
-        relations: ['steps', 'ingredients'],
+        relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
         order: {
           steps: { order: 'ASC' },
         },
@@ -331,7 +367,7 @@ export class RecipesService {
           batchSize,
         },
         order: { version: 'DESC' },
-        relations: ['steps', 'ingredients'],
+        relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
       });
 
       return recipes.map((recipe) => this.mapToVersionHistoryDto(recipe));
@@ -350,7 +386,7 @@ export class RecipesService {
     try {
       const existingRecipe = await this.recipeRepository.findOne({
         where: { id },
-        relations: ['steps', 'ingredients'],
+        relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
       });
 
       if (!existingRecipe) {
@@ -367,6 +403,29 @@ export class RecipesService {
         return this.createNewVersion(existingRecipe, updateRecipeDto, userId);
       }
 
+      // Validate unified queue order if steps or preparationQuestions are updated
+      if (updateRecipeDto.steps || updateRecipeDto.preparationQuestions) {
+        const allOrders: number[] = [];
+        if (updateRecipeDto.steps) {
+          updateRecipeDto.steps.forEach((step) => allOrders.push(step.order));
+        } else if (existingRecipe.steps) {
+          existingRecipe.steps.forEach((step) => allOrders.push(step.order));
+        }
+        if (updateRecipeDto.preparationQuestions) {
+          updateRecipeDto.preparationQuestions.forEach((prep) => allOrders.push(prep.order));
+        } else if (existingRecipe.preparationSteps) {
+          existingRecipe.preparationSteps.forEach((prep) => allOrders.push(prep.order));
+        }
+        
+        // Check for duplicate orders
+        const uniqueOrders = new Set(allOrders);
+        if (allOrders.length !== uniqueOrders.size) {
+          throw new BadRequestException(
+            `Order values must be unique across steps and preparationQuestions. Duplicate orders found.`,
+          );
+        }
+      }
+
       // Validate totalTime if steps are updated
       if (updateRecipeDto.steps) {
         const totalStepDuration = updateRecipeDto.steps.reduce((sum, step) => sum + step.duration, 0);
@@ -378,8 +437,8 @@ export class RecipesService {
         updateRecipeDto.totalTime = totalStepDuration;
       }
 
-      // Update recipe fields (exclude steps and ingredients as they are handled separately)
-      const { steps, ingredients, ...recipeFields } = updateRecipeDto;
+      // Update recipe fields (exclude steps, ingredients, and preparationQuestions as they are handled separately)
+      const { steps, ingredients, preparationQuestions, ...recipeFields } = updateRecipeDto;
       Object.assign(existingRecipe, {
         ...recipeFields,
         updatedBy: userId,
@@ -417,10 +476,37 @@ export class RecipesService {
         await this.ingredientRepository.save(ingredients);
       }
 
+      // Update preparation steps and questions if provided
+      if (updateRecipeDto.preparationQuestions !== undefined) {
+        // Delete all existing preparation steps (cascade will delete questions)
+        await this.preparationStepRepository.delete({ recipeId: id });
+
+        // Create new preparation steps and questions
+        if (updateRecipeDto.preparationQuestions.length > 0) {
+          for (const prepStepDto of updateRecipeDto.preparationQuestions) {
+            const preparationStep = this.preparationStepRepository.create({
+              recipeId: id,
+              order: prepStepDto.order,
+            });
+            const savedPrepStep = await this.preparationStepRepository.save(preparationStep);
+
+            // Create questions for this preparation step
+            const questions = prepStepDto.questions.map((questionDto) =>
+              this.preparationQuestionRepository.create({
+                preparationStepId: savedPrepStep.id,
+                question: questionDto.question,
+                hasCheckbox: questionDto.hasCheckbox,
+              }),
+            );
+            await this.preparationQuestionRepository.save(questions);
+          }
+        }
+      }
+
       // Reload with relations
       const updatedRecipe = await this.recipeRepository.findOne({
         where: { id },
-        relations: ['steps', 'ingredients'],
+        relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
         order: {
           steps: { order: 'ASC' },
         },
@@ -445,17 +531,18 @@ export class RecipesService {
     updateRecipeDto: UpdateRecipeDto,
     userId?: string,
   ): Promise<RecipeResponseDto> {
-    // Load existing recipe with relations if not already loaded
-    if (!existingRecipe.steps || !existingRecipe.ingredients) {
-      const fullRecipe = await this.recipeRepository.findOne({
-        where: { id: existingRecipe.id },
-        relations: ['steps', 'ingredients'],
-      });
-      if (fullRecipe) {
-        existingRecipe.steps = fullRecipe.steps;
-        existingRecipe.ingredients = fullRecipe.ingredients;
+      // Load existing recipe with relations if not already loaded
+      if (!existingRecipe.steps || !existingRecipe.ingredients || !existingRecipe.preparationSteps) {
+        const fullRecipe = await this.recipeRepository.findOne({
+          where: { id: existingRecipe.id },
+          relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
+        });
+        if (fullRecipe) {
+          existingRecipe.steps = fullRecipe.steps;
+          existingRecipe.ingredients = fullRecipe.ingredients;
+          existingRecipe.preparationSteps = fullRecipe.preparationSteps;
+        }
       }
-    }
 
     // Get next version number
     const existingRecipes = await this.recipeRepository.find({
@@ -542,10 +629,42 @@ export class RecipesService {
       await this.ingredientRepository.save(ingredients);
     }
 
+    // Copy preparation steps - need to load existing preparation steps if not provided
+    let preparationStepsToCopy = updateRecipeDto.preparationQuestions;
+    if (!preparationStepsToCopy && existingRecipe.preparationSteps) {
+      preparationStepsToCopy = existingRecipe.preparationSteps.map((prepStep) => ({
+        order: prepStep.order,
+        questions: prepStep.questions.map((question) => ({
+          question: question.question,
+          hasCheckbox: question.hasCheckbox,
+        })),
+      }));
+    }
+
+    if (preparationStepsToCopy) {
+      for (const prepStepDto of preparationStepsToCopy) {
+        const preparationStep = this.preparationStepRepository.create({
+          recipeId: savedRecipe.id,
+          order: prepStepDto.order,
+        });
+        const savedPrepStep = await this.preparationStepRepository.save(preparationStep);
+
+        // Create questions for this preparation step
+        const questions = prepStepDto.questions.map((questionDto) =>
+          this.preparationQuestionRepository.create({
+            preparationStepId: savedPrepStep.id,
+            question: questionDto.question,
+            hasCheckbox: questionDto.hasCheckbox,
+          }),
+        );
+        await this.preparationQuestionRepository.save(questions);
+      }
+    }
+
     // Reload with relations
     const recipe = await this.recipeRepository.findOne({
       where: { id: savedRecipe.id },
-      relations: ['steps', 'ingredients'],
+      relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
       order: {
         steps: { order: 'ASC' },
       },
@@ -618,7 +737,7 @@ export class RecipesService {
     try {
       const recipe = await this.recipeRepository.findOne({
         where: { id },
-        relations: ['steps', 'ingredients'],
+        relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
       });
 
       if (!recipe) {
@@ -705,6 +824,21 @@ export class RecipesService {
         createdAt: ingredient.createdAt,
         updatedAt: ingredient.updatedAt,
       })),
+      preparationQuestions: (recipe.preparationSteps || [])
+        .sort((a, b) => a.order - b.order)
+        .map((prepStep) => ({
+          id: prepStep.id,
+          order: prepStep.order,
+          questions: (prepStep.questions || []).map((question) => ({
+            id: question.id,
+            question: question.question,
+            hasCheckbox: question.hasCheckbox,
+            createdAt: question.createdAt,
+            updatedAt: question.updatedAt,
+          })),
+          createdAt: prepStep.createdAt,
+          updatedAt: prepStep.updatedAt,
+        })),
       createdAt: recipe.createdAt,
       updatedAt: recipe.updatedAt,
     };
