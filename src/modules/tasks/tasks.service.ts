@@ -1967,4 +1967,61 @@ export class TasksService {
       })),
     };
   }
+
+  /**
+   * Find task status by order number (Public endpoint)
+   * Returns simplified task information for order tracking
+   */
+  async getTaskStatusByOrderNumber(orderNumber: string): Promise<{
+    orderNumber: string;
+    taskId: string;
+    task: string;
+    status: TaskStatus;
+    phase: {
+      id: string;
+      name: string;
+    };
+    customerName?: string;
+    customerMobile?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    dueDate?: Date;
+  }> {
+    this.logger.log(`getTaskStatusByOrderNumber - Searching for order: ${orderNumber}`);
+
+    if (!orderNumber || orderNumber.trim() === '') {
+      throw new BadRequestException('Order number is required');
+    }
+
+    const task = await this.taskRepository.findOne({
+      where: { orderNumber: orderNumber.trim() },
+      relations: ['phase'],
+      order: { createdAt: 'DESC' }, // Get the most recent task if multiple exist
+    });
+
+    if (!task) {
+      this.logger.warn(`getTaskStatusByOrderNumber - No task found for order: ${orderNumber}`);
+      throw new NotFoundException(`No task found for order number: ${orderNumber}`);
+    }
+
+    this.logger.log(
+      `getTaskStatusByOrderNumber - Task found: ${task.id} (taskId: ${task.taskId}) for order: ${orderNumber}`,
+    );
+
+    return {
+      orderNumber: task.orderNumber!,
+      taskId: task.taskId,
+      task: task.task,
+      status: task.status,
+      phase: {
+        id: task.phase.id,
+        name: task.phase.name,
+      },
+      customerName: task.customerName,
+      customerMobile: task.customerMobile,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      dueDate: task.dueDate,
+    };
+  }
 }

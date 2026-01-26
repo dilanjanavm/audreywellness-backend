@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, MaxLength } from 'class-validator';
 
 export class SendSmsDto {
   @IsString()
@@ -6,9 +6,9 @@ export class SendSmsDto {
   recipient: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(11)
-  sender_id: string;
+  sender_id?: string;
 
   @IsString()
   @IsNotEmpty()

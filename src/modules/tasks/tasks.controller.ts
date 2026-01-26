@@ -12,12 +12,17 @@ import {
   Query,
   UseFilters,
   UseInterceptors,
+  SetMetadata,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import * as taskInterface from '../../common/interfaces/task.interface';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { TaskStatus } from '../../common/enums/task.enum';
+
+// Decorator to mark endpoints as public (skip authentication)
+const IS_PUBLIC_KEY = 'isPublic';
+export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
 @Controller('tasks')
 @UseFilters(HttpExceptionFilter)
@@ -187,6 +192,30 @@ export class TasksController {
     } catch (error) {
       this.logger.error(
         `GET /tasks/phases/${phaseId}/tasks - Error: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Public endpoint: Get task status by order number
+   * GET /tasks/public/status/:orderNumber
+   * No authentication required
+   */
+  @Get('public/status/:orderNumber')
+  @Public()
+  async getTaskStatusByOrderNumber(@Param('orderNumber') orderNumber: string) {
+    this.logger.log(`GET /tasks/public/status/${orderNumber} - Request received`);
+    try {
+      const data = await this.tasksService.getTaskStatusByOrderNumber(orderNumber);
+      this.logger.log(
+        `GET /tasks/public/status/${orderNumber} - Success: Task found with status: ${data.status}`,
+      );
+      return { data };
+    } catch (error) {
+      this.logger.error(
+        `GET /tasks/public/status/${orderNumber} - Error: ${error.message}`,
         error.stack,
       );
       throw error;
