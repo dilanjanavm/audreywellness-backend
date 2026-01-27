@@ -3,6 +3,7 @@ import {
   IsUUID,
   IsNumber,
   IsString,
+  IsBoolean,
   Min,
   Max,
 } from 'class-validator';
@@ -70,6 +71,11 @@ export class ResumeExecutionDto {
   @IsNumber()
   @Min(0)
   remainingTime?: number; // Remaining time for current step in minutes (from frontend timer, optional)
+}
+
+export class UpdatePreparationQuestionStatusDto {
+  @IsBoolean()
+  checked: boolean; // true to mark as checked, false to mark as unchecked
 }
 
 // Response DTOs

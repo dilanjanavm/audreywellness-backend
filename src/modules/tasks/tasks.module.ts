@@ -6,6 +6,7 @@ import { TaskCommentEntity } from './entities/task-comment.entity';
 import { TaskMovementHistoryEntity } from './entities/task-movement-history.entity';
 import { TaskRecipeExecutionEntity } from './entities/task-recipe-execution.entity';
 import { TaskRecipeStepExecutionEntity } from './entities/task-recipe-step-execution.entity';
+import { TaskRecipePreparationQuestionStatusEntity } from './entities/task-recipe-preparation-question-status.entity';
 import { TaskTemplateEntity } from './entities/task-template.entity';
 import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';
@@ -27,6 +28,7 @@ import { RecipesModule } from '../recipes/recipes.module';
       TaskMovementHistoryEntity,
       TaskRecipeExecutionEntity,
       TaskRecipeStepExecutionEntity,
+      TaskRecipePreparationQuestionStatusEntity,
       TaskTemplateEntity,
       User,
       CostingEntity,

@@ -2,11 +2,13 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Param,
   Body,
   UseGuards,
   Logger,
   ParseIntPipe,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RecipeExecutionService } from './recipe-execution.service';
@@ -17,6 +19,7 @@ import {
   RecipeExecutionStatusDto,
   PauseExecutionDto,
   ResumeExecutionDto,
+  UpdatePreparationQuestionStatusDto,
 } from './dto/recipe-execution.dto';
 
 @Controller('tasks/:taskId/recipe')
@@ -123,6 +126,39 @@ export class RecipeExecutionController {
   ): Promise<RecipeExecutionStatusDto> {
     this.logger.log(`Cancelling recipe execution for task: ${taskId}`);
     return this.recipeExecutionService.cancelExecution(taskId);
+  }
+
+  /**
+   * Update preparation question checkbox status
+   * PATCH /tasks/:taskId/recipe/preparation/:preparationStepId/questions/:questionId/check
+   */
+  @Patch('preparation/:preparationStepId/questions/:questionId/check')
+  async updatePreparationQuestionStatus(
+    @Param('taskId') taskId: string,
+    @Param('preparationStepId', ParseUUIDPipe) preparationStepId: string,
+    @Param('questionId', ParseUUIDPipe) questionId: string,
+    @Body() dto: UpdatePreparationQuestionStatusDto,
+  ): Promise<{
+    statusCode: number;
+    success: boolean;
+    message: string;
+    data: {
+      taskId: string;
+      preparationStepId: string;
+      questionId: string;
+      checked: boolean;
+      updatedAt: Date;
+    };
+  }> {
+    this.logger.log(
+      `Updating preparation question status for task: ${taskId}, step: ${preparationStepId}, question: ${questionId}`,
+    );
+    return this.recipeExecutionService.updatePreparationQuestionStatus(
+      taskId,
+      preparationStepId,
+      questionId,
+      dto,
+    );
   }
 }
 

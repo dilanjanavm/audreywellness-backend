@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { TaskEntity } from './task.entity';
 import { TaskRecipeStepExecutionEntity } from './task-recipe-step-execution.entity';
+import { TaskRecipePreparationQuestionStatusEntity } from './task-recipe-preparation-question-status.entity';
 import { RecipeExecutionStatus } from '../../../common/enums/recipe-execution.enum';
 
 @Entity('task_recipe_executions')
@@ -83,6 +84,13 @@ export class TaskRecipeExecutionEntity {
     { cascade: true },
   )
   stepExecutions?: TaskRecipeStepExecutionEntity[];
+
+  @OneToMany(
+    () => TaskRecipePreparationQuestionStatusEntity,
+    (questionStatus) => questionStatus.execution,
+    { cascade: true },
+  )
+  preparationQuestionStatuses?: TaskRecipePreparationQuestionStatusEntity[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

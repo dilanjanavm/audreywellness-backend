@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { TaskEntity } from './entities/task.entity';
 import { TaskRecipeExecutionEntity } from './entities/task-recipe-execution.entity';
 import { TaskRecipeStepExecutionEntity } from './entities/task-recipe-step-execution.entity';
+import { TaskRecipePreparationQuestionStatusEntity } from './entities/task-recipe-preparation-question-status.entity';
 import {
   RecipeExecutionStatus,
   StepExecutionStatus,
@@ -21,6 +22,7 @@ import {
   StepExecutionStatusDto,
   PauseExecutionDto,
   ResumeExecutionDto,
+  UpdatePreparationQuestionStatusDto,
 } from './dto/recipe-execution.dto';
 import { RecipesService } from '../recipes/recipes.service';
 import { RecipeStep } from '../recipes/entities/recipe-step.entity';
@@ -37,6 +39,8 @@ export class RecipeExecutionService {
     private readonly executionRepository: Repository<TaskRecipeExecutionEntity>,
     @InjectRepository(TaskRecipeStepExecutionEntity)
     private readonly stepExecutionRepository: Repository<TaskRecipeStepExecutionEntity>,
+    @InjectRepository(TaskRecipePreparationQuestionStatusEntity)
+    private readonly preparationQuestionStatusRepository: Repository<TaskRecipePreparationQuestionStatusEntity>,
     private readonly recipesService: RecipesService,
   ) {}
 
@@ -915,6 +919,135 @@ export class RecipeExecutionService {
       remainingTimeAtPause: execution.remainingTimeAtPause,
       recipe,
       stepExecutions: stepExecutionDtos,
+    };
+  }
+
+  /**
+   * Update preparation question checkbox status
+   */
+  async updatePreparationQuestionStatus(
+    taskId: string,
+    preparationStepId: string,
+    questionId: string,
+    dto: UpdatePreparationQuestionStatusDto,
+  ): Promise<{
+    statusCode: number;
+    success: boolean;
+    message: string;
+    data: {
+      taskId: string;
+      preparationStepId: string;
+      questionId: string;
+      checked: boolean;
+      updatedAt: Date;
+    };
+  }> {
+    this.logger.log(
+      `updatePreparationQuestionStatus - Task: ${taskId}, Step: ${preparationStepId}, Question: ${questionId}, Checked: ${dto.checked}`,
+    );
+
+    // Find task
+    const task = await this.taskRepository.findOne({
+      where: { taskId },
+      relations: ['recipeExecution'],
+    });
+
+    if (!task) {
+      throw new NotFoundException(`Task not found`);
+    }
+
+    // Find or get execution
+    let execution = task.recipeExecution;
+    if (!execution) {
+      // Create execution if it doesn't exist
+      execution = await this.findOrCreateExecution(taskId);
+    }
+
+    // Get recipe to validate preparation step and question exist
+    const recipe = await this.recipesService.findOne(execution.recipeId, false);
+
+    if (!recipe) {
+      throw new NotFoundException(
+        `Recipe not found for this task execution`,
+      );
+    }
+
+    // Check if recipe has preparation questions
+    if (!recipe.preparationQuestions || recipe.preparationQuestions.length === 0) {
+      throw new NotFoundException(
+        `Preparation step not found for this task. Recipe does not have preparation questions.`,
+      );
+    }
+
+    // Find the preparation step
+    const preparationStep = recipe.preparationQuestions.find(
+      (step) => step.id === preparationStepId,
+    );
+
+    if (!preparationStep) {
+      throw new NotFoundException(
+        `Preparation step not found for this task`,
+      );
+    }
+
+    // Find the question within the preparation step
+    if (!preparationStep.questions || preparationStep.questions.length === 0) {
+      throw new NotFoundException(
+        `Question not found in preparation step`,
+      );
+    }
+
+    const question = preparationStep.questions.find(
+      (q) => q.id === questionId,
+    );
+
+    if (!question) {
+      throw new NotFoundException(
+        `Question not found in preparation step`,
+      );
+    }
+
+    // Find existing status or create new one
+    let questionStatus = await this.preparationQuestionStatusRepository.findOne({
+      where: {
+        executionId: execution.id,
+        preparationStepId,
+        questionId,
+      },
+    });
+
+    if (questionStatus) {
+      // Update existing status
+      questionStatus.checked = dto.checked;
+      await this.preparationQuestionStatusRepository.save(questionStatus);
+      this.logger.log(
+        `updatePreparationQuestionStatus - Updated existing status: ${questionStatus.id}`,
+      );
+    } else {
+      // Create new status
+      questionStatus = this.preparationQuestionStatusRepository.create({
+        executionId: execution.id,
+        preparationStepId,
+        questionId,
+        checked: dto.checked,
+      });
+      await this.preparationQuestionStatusRepository.save(questionStatus);
+      this.logger.log(
+        `updatePreparationQuestionStatus - Created new status: ${questionStatus.id}`,
+      );
+    }
+
+    return {
+      statusCode: 200,
+      success: true,
+      message: 'Preparation question status updated successfully',
+      data: {
+        taskId: task.taskId,
+        preparationStepId,
+        questionId,
+        checked: questionStatus.checked,
+        updatedAt: questionStatus.updatedAt,
+      },
     };
   }
 }
