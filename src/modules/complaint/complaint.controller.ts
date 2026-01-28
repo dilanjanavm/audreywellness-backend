@@ -16,7 +16,11 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+<<<<<<< HEAD
 import { RolesGuard } from '../../common/guards/roles.guard';
+=======
+
+>>>>>>> origin/new-dev
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { ComplaintService } from './complaint.service';
@@ -28,9 +32,15 @@ import {
 } from 'src/common/enums/complain.enum';
 
 @Controller('complaints')
+<<<<<<< HEAD
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ComplaintController {
   constructor(private readonly complaintService: ComplaintService) {}
+=======
+@UseGuards(JwtAuthGuard)
+export class ComplaintController {
+  constructor(private readonly complaintService: ComplaintService) { }
+>>>>>>> origin/new-dev
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
@@ -74,9 +84,15 @@ export class ComplaintController {
       dateRange:
         startDate && endDate
           ? {
+<<<<<<< HEAD
               startDate: new Date(startDate),
               endDate: new Date(endDate),
             }
+=======
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
+          }
+>>>>>>> origin/new-dev
           : undefined,
       page,
       limit: limit > 100 ? 100 : limit,
@@ -155,4 +171,23 @@ export class ComplaintController {
   ): Promise<complaintInterface.ComplaintResponseDto> {
     return this.complaintService.submitFeedback(id, feedback, rating);
   }
+<<<<<<< HEAD
+=======
+
+  @Post(':id/send-sms')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  async sendSms(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('phoneNumber') phoneNumber: string,
+    @Body('message') message: string,
+    @Request() req,
+  ): Promise<complaintInterface.ComplaintResponseDto> {
+    return this.complaintService.sendSmsNotification(
+      id,
+      phoneNumber,
+      message,
+      req.user.userId,
+    );
+  }
+>>>>>>> origin/new-dev
 }

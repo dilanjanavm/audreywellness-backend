@@ -56,7 +56,11 @@ export class CostingService {
     private dataSource: DataSource,
     private readonly recipesService: RecipesService, // Inject RecipesService
     //categoryRepository
+<<<<<<< HEAD
   ) {}
+=======
+  ) { }
+>>>>>>> origin/new-dev
 
   /**
    * Create a new costing with version control
@@ -375,6 +379,31 @@ export class CostingService {
     }
   }
 
+<<<<<<< HEAD
+=======
+  /**
+   * Delete all costings for an item
+   */
+  async removeAllByItem(itemId: string): Promise<void> {
+    try {
+      const costings = await this.costingRepository.find({ where: { itemId } });
+
+      if (!costings || costings.length === 0) {
+        throw new NotFoundException(`No costings found for item ID ${itemId}`);
+      }
+
+      // Delete all costings for this item
+      await this.costingRepository.delete({ itemId });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error(`Error deleting all costings for item ${itemId}:`, error);
+      throw new InternalServerErrorException('Failed to delete costings for item');
+    }
+  }
+
+>>>>>>> origin/new-dev
   // ========== PRIVATE HELPER METHODS ==========
 
   private async createRawMaterials(
@@ -1170,7 +1199,11 @@ export class CostingService {
             page: 1,
             limit: 100,
           });
+<<<<<<< HEAD
           
+=======
+
+>>>>>>> origin/new-dev
           // Find the recipe with isActiveVersion = true (selected version)
           if (activeRecipes.data && activeRecipes.data.length > 0) {
             const selectedRecipe = activeRecipes.data.find((r: any) => r.isActiveVersion === true);
@@ -1308,6 +1341,7 @@ export class CostingService {
       // Get active recipes for all items
       const recipeMap = new Map<string, any>();
       const recipeCountMap = new Map<string, number>();
+<<<<<<< HEAD
       
       // For each item, find its active recipe
       for (const itemId of filteredItemIds) {
@@ -1334,6 +1368,34 @@ export class CostingService {
               }
               recipeCountMap.set(itemId, itemRecipes.total || itemRecipes.data.length);
             }
+=======
+
+      // For each item, find its active recipe
+      for (const itemId of filteredItemIds) {
+        try {
+          const itemRecipes = await this.recipesService.findAll({
+            productId: itemId,
+            status: 'active' as any,
+            includeVersions: 'false',
+            page: 1,
+            limit: 100,
+          });
+
+          if (itemRecipes.data && itemRecipes.data.length > 0) {
+            // Find the recipe with isActiveVersion = true (selected version)
+            const selectedRecipe = itemRecipes.data.find((r: any) => r.isActiveVersion === true);
+            if (selectedRecipe) {
+              // Get full recipe details
+              const fullRecipe = await this.recipesService.findOne(selectedRecipe.id, false);
+              recipeMap.set(itemId, fullRecipe);
+            } else if (itemRecipes.data.length > 0) {
+              // If no active version, get the first one
+              const fullRecipe = await this.recipesService.findOne(itemRecipes.data[0].id, false);
+              recipeMap.set(itemId, fullRecipe);
+            }
+            recipeCountMap.set(itemId, itemRecipes.total || itemRecipes.data.length);
+          }
+>>>>>>> origin/new-dev
         } catch (error) {
           // If recipe not found for this item, continue
           console.log(`No recipe found for item ${itemId}:`, error.message);

@@ -9,15 +9,29 @@ import { CustomerModule } from '../customer/customer.module';
 import { UsersModule } from '../users/users.module';
 import { AttachmentModule } from '../attachment/attachment.module'; // NEW
 
+<<<<<<< HEAD
+=======
+import { SmsModule } from '../sms/sms.module';
+
+>>>>>>> origin/new-dev
 @Module({
   imports: [
     TypeOrmModule.forFeature([ComplaintEntity, ComplaintTimelineEntity]),
     CustomerModule,
     UsersModule,
+<<<<<<< HEAD
     AttachmentModule, // NEW
+=======
+    AttachmentModule,
+    SmsModule,
+>>>>>>> origin/new-dev
   ],
   controllers: [ComplaintController],
   providers: [ComplaintService],
   exports: [ComplaintService],
 })
+<<<<<<< HEAD
 export class ComplaintModule {}
+=======
+export class ComplaintModule { }
+>>>>>>> origin/new-dev

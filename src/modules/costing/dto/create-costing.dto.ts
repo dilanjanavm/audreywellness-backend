@@ -43,6 +43,12 @@ export class RawMaterialBatchCalculationsDto {
 
   @IsObject()
   batch200kg: RawMaterialBatchCalculationDto;
+<<<<<<< HEAD
+=======
+
+  @IsObject()
+  batch250kg: RawMaterialBatchCalculationDto;
+>>>>>>> origin/new-dev
 }
 
 export class RawMaterialDto {
@@ -62,6 +68,10 @@ export class RawMaterialDto {
   supplier: string;
 
   @IsUUID()
+<<<<<<< HEAD
+=======
+  @IsOptional()
+>>>>>>> origin/new-dev
   supplierId: string;
 
   @IsString()
@@ -106,6 +116,12 @@ export class AdditionalCostBatchDto {
 
   @IsNumber()
   batch200kg: number;
+<<<<<<< HEAD
+=======
+
+  @IsNumber()
+  batch250kg: number;
+>>>>>>> origin/new-dev
 }
 
 export class AdditionalCostDto {

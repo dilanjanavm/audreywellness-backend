@@ -7,4 +7,8 @@ export enum BatchSize {
   BATCH_100_KG = 'batch100kg',
   BATCH_150_KG = 'batch150kg',
   BATCH_200_KG = 'batch200kg',
+<<<<<<< HEAD
+=======
+  BATCH_250_KG = 'batch250kg',
+>>>>>>> origin/new-dev
 }

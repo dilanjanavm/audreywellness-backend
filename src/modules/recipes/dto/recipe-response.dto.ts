@@ -40,6 +40,10 @@ export class PreparationStepResponseDto {
 export class RecipeResponseDto {
   id: string;
   name: string;
+<<<<<<< HEAD
+=======
+  productName?: string;
+>>>>>>> origin/new-dev
   productId: string;
   itemId: string;
   batchSize: string;

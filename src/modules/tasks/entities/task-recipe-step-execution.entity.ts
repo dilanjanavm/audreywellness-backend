@@ -65,7 +65,17 @@ export class TaskRecipeStepExecutionEntity {
   actualDuration?: number; // in minutes
 
   // Accumulated elapsed time for this step (in minutes) - excludes pause time
+<<<<<<< HEAD
   @Column({ name: 'step_elapsed_time', type: 'int', default: 0 })
+=======
+  @Column({
+    name: 'step_elapsed_time',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
+>>>>>>> origin/new-dev
   stepElapsedTime: number;
 
   // Timestamps

@@ -25,6 +25,10 @@ import {
   ComplaintStatus,
   PriorityLevel,
 } from '../../common/enums/complain.enum';
+<<<<<<< HEAD
+=======
+import { SendlkApiService } from '../sms/services/sendlk-api.service';
+>>>>>>> origin/new-dev
 
 @Injectable()
 export class ComplaintService {
@@ -35,7 +39,12 @@ export class ComplaintService {
     private readonly timelineRepository: Repository<ComplaintTimelineEntity>,
     private readonly customerService: CustomerService,
     private readonly userService: UsersService,
+<<<<<<< HEAD
   ) {}
+=======
+    private readonly sendlkApiService: SendlkApiService, // Injected
+  ) { }
+>>>>>>> origin/new-dev
 
   async generateComplaintNumber(): Promise<string> {
     const lastComplaint = await this.complaintRepository.findOne({
@@ -412,6 +421,19 @@ export class ComplaintService {
         );
       }
 
+<<<<<<< HEAD
+=======
+      // Handle SMS Notification
+      if (updateStatusDto.smsNotification?.send) {
+        await this.createTimelineEntry(
+          id,
+          updatedById,
+          TimelineEntryType.SMS_SENT,
+          `SMS sent to ${updateStatusDto.smsNotification.phoneNumber}: ${updateStatusDto.smsNotification.message}`,
+        );
+      }
+
+>>>>>>> origin/new-dev
       const updatedComplaint = await this.complaintRepository.save({
         ...complaint,
         ...updateData,
@@ -575,6 +597,35 @@ export class ComplaintService {
     }
   }
 
+<<<<<<< HEAD
+=======
+  async sendSmsNotification(
+    id: string,
+    phoneNumber: string,
+    message: string,
+    sentById: string,
+  ): Promise<ComplaintResponseDto> {
+    try {
+      // 1. Send SMS via API
+      await this.sendlkApiService.sendSms(phoneNumber, message);
+
+      // 2. Create Timeline Entry
+      await this.createTimelineEntry(
+        id,
+        sentById,
+        TimelineEntryType.SMS_SENT,
+        `SMS sent to ${phoneNumber}: ${message}`,
+      );
+
+      // 3. Return updated complaint
+      return this.findOne(id);
+    } catch (error) {
+      console.error('Error sending SMS notification:', error);
+      throw error;
+    }
+  }
+
+>>>>>>> origin/new-dev
   private mapToResponseDto(complaint: ComplaintEntity): ComplaintResponseDto {
     return {
       id: complaint.id,

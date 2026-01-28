@@ -41,7 +41,11 @@ export class RecipesService {
     private readonly preparationQuestionRepository: Repository<RecipePreparationQuestion>,
     @InjectRepository(ItemEntity)
     private readonly itemRepository: Repository<ItemEntity>,
+<<<<<<< HEAD
   ) {}
+=======
+  ) { }
+>>>>>>> origin/new-dev
 
   /**
    * Create a new recipe with versioning support
@@ -73,7 +77,11 @@ export class RecipesService {
       if (createRecipeDto.preparationQuestions) {
         createRecipeDto.preparationQuestions.forEach((prep) => allOrders.push(prep.order));
       }
+<<<<<<< HEAD
       
+=======
+
+>>>>>>> origin/new-dev
       // Check for duplicate orders
       const uniqueOrders = new Set(allOrders);
       if (allOrders.length !== uniqueOrders.size) {
@@ -129,6 +137,12 @@ export class RecipesService {
 
       const savedRecipe = await this.recipeRepository.save(recipe);
 
+<<<<<<< HEAD
+=======
+      // Assign product for response mapping
+      savedRecipe.product = product;
+
+>>>>>>> origin/new-dev
       // Create steps
       const steps = createRecipeDto.steps.map((stepDto) =>
         this.stepRepository.create({
@@ -241,6 +255,10 @@ export class RecipesService {
       queryBuilder
         .leftJoinAndSelect('recipe.steps', 'steps')
         .leftJoinAndSelect('recipe.ingredients', 'ingredients')
+<<<<<<< HEAD
+=======
+        .leftJoinAndSelect('recipe.product', 'product')
+>>>>>>> origin/new-dev
         .leftJoinAndSelect('recipe.preparationSteps', 'preparationSteps')
         .leftJoinAndSelect('preparationSteps.questions', 'preparationQuestions')
         .orderBy('recipe.createdAt', 'DESC')
@@ -302,7 +320,12 @@ export class RecipesService {
     try {
       const recipe = await this.recipeRepository.findOne({
         where: { id },
+<<<<<<< HEAD
         relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
+=======
+
+        relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions', 'product'],
+>>>>>>> origin/new-dev
         order: {
           steps: { order: 'ASC' },
         },
@@ -319,7 +342,11 @@ export class RecipesService {
           batchSize: recipe.batchSize,
         },
         order: { version: 'DESC' },
+<<<<<<< HEAD
         relations: ['steps', 'ingredients'],
+=======
+        relations: ['steps', 'ingredients', 'product'],
+>>>>>>> origin/new-dev
       });
 
       // Sort steps for each version
@@ -333,7 +360,11 @@ export class RecipesService {
       const countOfVersions = allVersions.length;
 
       const responseDto = this.mapToResponseDto(recipe);
+<<<<<<< HEAD
       
+=======
+
+>>>>>>> origin/new-dev
       // If includeVersions is true, return full recipe data for all versions
       // Otherwise, return summary only
       if (includeVersions) {
@@ -341,7 +372,11 @@ export class RecipesService {
       } else {
         responseDto.allVersions = allVersions.map((v) => this.mapToVersionHistoryDto(v));
       }
+<<<<<<< HEAD
       
+=======
+
+>>>>>>> origin/new-dev
       responseDto.countOfVersions = countOfVersions;
 
       return responseDto;
@@ -367,7 +402,11 @@ export class RecipesService {
           batchSize,
         },
         order: { version: 'DESC' },
+<<<<<<< HEAD
         relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
+=======
+        relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions', 'product'],
+>>>>>>> origin/new-dev
       });
 
       return recipes.map((recipe) => this.mapToVersionHistoryDto(recipe));
@@ -386,7 +425,11 @@ export class RecipesService {
     try {
       const existingRecipe = await this.recipeRepository.findOne({
         where: { id },
+<<<<<<< HEAD
         relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
+=======
+        relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions', 'product'],
+>>>>>>> origin/new-dev
       });
 
       if (!existingRecipe) {
@@ -416,7 +459,11 @@ export class RecipesService {
         } else if (existingRecipe.preparationSteps) {
           existingRecipe.preparationSteps.forEach((prep) => allOrders.push(prep.order));
         }
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> origin/new-dev
         // Check for duplicate orders
         const uniqueOrders = new Set(allOrders);
         if (allOrders.length !== uniqueOrders.size) {
@@ -506,7 +553,11 @@ export class RecipesService {
       // Reload with relations
       const updatedRecipe = await this.recipeRepository.findOne({
         where: { id },
+<<<<<<< HEAD
         relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
+=======
+        relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions', 'product'],
+>>>>>>> origin/new-dev
         order: {
           steps: { order: 'ASC' },
         },
@@ -531,6 +582,7 @@ export class RecipesService {
     updateRecipeDto: UpdateRecipeDto,
     userId?: string,
   ): Promise<RecipeResponseDto> {
+<<<<<<< HEAD
       // Load existing recipe with relations if not already loaded
       if (!existingRecipe.steps || !existingRecipe.ingredients || !existingRecipe.preparationSteps) {
         const fullRecipe = await this.recipeRepository.findOne({
@@ -543,6 +595,20 @@ export class RecipesService {
           existingRecipe.preparationSteps = fullRecipe.preparationSteps;
         }
       }
+=======
+    // Load existing recipe with relations if not already loaded
+    if (!existingRecipe.steps || !existingRecipe.ingredients || !existingRecipe.preparationSteps) {
+      const fullRecipe = await this.recipeRepository.findOne({
+        where: { id: existingRecipe.id },
+        relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions', 'product'],
+      });
+      if (fullRecipe) {
+        existingRecipe.steps = fullRecipe.steps;
+        existingRecipe.ingredients = fullRecipe.ingredients;
+        existingRecipe.preparationSteps = fullRecipe.preparationSteps;
+      }
+    }
+>>>>>>> origin/new-dev
 
     // Get next version number
     const existingRecipes = await this.recipeRepository.find({
@@ -664,7 +730,11 @@ export class RecipesService {
     // Reload with relations
     const recipe = await this.recipeRepository.findOne({
       where: { id: savedRecipe.id },
+<<<<<<< HEAD
       relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
+=======
+      relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions', 'product'],
+>>>>>>> origin/new-dev
       order: {
         steps: { order: 'ASC' },
       },
@@ -737,7 +807,11 @@ export class RecipesService {
     try {
       const recipe = await this.recipeRepository.findOne({
         where: { id },
+<<<<<<< HEAD
         relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions'],
+=======
+        relations: ['steps', 'ingredients', 'preparationSteps', 'preparationSteps.questions', 'product'],
+>>>>>>> origin/new-dev
       });
 
       if (!recipe) {
@@ -795,6 +869,10 @@ export class RecipesService {
     return {
       id: recipe.id,
       name: recipe.name,
+<<<<<<< HEAD
+=======
+      productName: recipe.product?.description || recipe.product?.itemCode,
+>>>>>>> origin/new-dev
       productId: recipe.productId,
       itemId: recipe.itemId,
       batchSize: recipe.batchSize,

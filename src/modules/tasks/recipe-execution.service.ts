@@ -9,6 +9,10 @@ import { Repository } from 'typeorm';
 import { TaskEntity } from './entities/task.entity';
 import { TaskRecipeExecutionEntity } from './entities/task-recipe-execution.entity';
 import { TaskRecipeStepExecutionEntity } from './entities/task-recipe-step-execution.entity';
+<<<<<<< HEAD
+=======
+import { TaskRecipePreparationQuestionStatusEntity } from './entities/task-recipe-preparation-question-status.entity';
+>>>>>>> origin/new-dev
 import {
   RecipeExecutionStatus,
   StepExecutionStatus,
@@ -21,6 +25,10 @@ import {
   StepExecutionStatusDto,
   PauseExecutionDto,
   ResumeExecutionDto,
+<<<<<<< HEAD
+=======
+  UpdatePreparationQuestionStatusDto,
+>>>>>>> origin/new-dev
 } from './dto/recipe-execution.dto';
 import { RecipesService } from '../recipes/recipes.service';
 import { RecipeStep } from '../recipes/entities/recipe-step.entity';
@@ -37,8 +45,15 @@ export class RecipeExecutionService {
     private readonly executionRepository: Repository<TaskRecipeExecutionEntity>,
     @InjectRepository(TaskRecipeStepExecutionEntity)
     private readonly stepExecutionRepository: Repository<TaskRecipeStepExecutionEntity>,
+<<<<<<< HEAD
     private readonly recipesService: RecipesService,
   ) {}
+=======
+    @InjectRepository(TaskRecipePreparationQuestionStatusEntity)
+    private readonly preparationQuestionStatusRepository: Repository<TaskRecipePreparationQuestionStatusEntity>,
+    private readonly recipesService: RecipesService,
+  ) { }
+>>>>>>> origin/new-dev
 
   /**
    * Find or create recipe execution for a task
@@ -733,6 +748,40 @@ export class RecipeExecutionService {
   }
 
   /**
+<<<<<<< HEAD
+=======
+   * Delete recipe execution (used when deleting a task)
+   */
+  /**
+   * Delete recipe execution (used when deleting a task)
+   */
+  async deleteExecution(taskId: string): Promise<void> {
+    const task = await this.taskRepository.findOne({
+      where: { id: taskId }, // Assuming taskId passed here is the UUID
+      relations: ['recipeExecution'],
+    });
+
+    if (task && task.recipeExecution) {
+      // Manually delete related records first to avoid foreign key constraints
+      // (in case DB cascade is not set up correctly)
+
+      // 1. Delete preparation question statuses
+      await this.preparationQuestionStatusRepository.delete({
+        executionId: task.recipeExecution.id,
+      });
+
+      // 2. Delete step executions
+      await this.stepExecutionRepository.delete({
+        executionId: task.recipeExecution.id,
+      });
+
+      // 3. Delete the execution entity
+      await this.executionRepository.remove(task.recipeExecution);
+    }
+  }
+
+  /**
+>>>>>>> origin/new-dev
    * Get execution by task ID
    */
   private async getExecutionByTaskId(
@@ -774,7 +823,11 @@ export class RecipeExecutionService {
     // Find current step details and calculate elapsed time
     let currentStep: RecipeExecutionStatusDto['currentStep'] | undefined;
     let currentStepElapsedTime: number | undefined;
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/new-dev
     if (execution.currentStepId && execution.currentStepOrder) {
       const currentStepExecution = stepExecutions.find(
         (se) => se.recipeStepId === execution.currentStepId,
@@ -917,5 +970,162 @@ export class RecipeExecutionService {
       stepExecutions: stepExecutionDtos,
     };
   }
+<<<<<<< HEAD
+=======
+
+  /**
+   * Update preparation question checkbox status
+   */
+  async updatePreparationQuestionStatus(
+    taskId: string,
+    preparationStepId: string,
+    questionId: string,
+    dto: UpdatePreparationQuestionStatusDto,
+  ): Promise<{
+    statusCode: number;
+    success: boolean;
+    message: string;
+    data: {
+      taskId: string;
+      preparationStepId: string;
+      questionId: string;
+      checked: boolean;
+      updatedAt: Date;
+    };
+  }> {
+    this.logger.log(
+      `updatePreparationQuestionStatus - Task: ${taskId}, Step: ${preparationStepId}, Question: ${questionId}, Checked: ${dto.checked}`,
+    );
+
+    // Find task - support both UUID (id) and string ID (taskId)
+    let task: TaskEntity | null = null;
+
+    // Check if it's a UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(taskId);
+
+    if (isUuid) {
+      task = await this.taskRepository.findOne({
+        where: { id: taskId },
+        relations: ['recipeExecution'],
+      });
+    }
+
+    if (!task) {
+      task = await this.taskRepository.findOne({
+        where: { taskId },
+        relations: ['recipeExecution'],
+      });
+    }
+
+    if (!task) {
+      throw new NotFoundException(`Task not found`);
+    }
+
+    // Find or get execution
+    let execution = task.recipeExecution;
+    if (!execution) {
+      // Create execution if it doesn't exist
+      execution = await this.findOrCreateExecution(taskId);
+    }
+
+    // Get recipe to validate preparation step and question exist
+    const recipe = await this.recipesService.findOne(execution.recipeId, false);
+
+    if (!recipe) {
+      throw new NotFoundException(
+        `Recipe not found for this task execution`,
+      );
+    }
+
+    // Check if recipe has preparation questions
+    if (!recipe.preparationQuestions || recipe.preparationQuestions.length === 0) {
+      throw new NotFoundException(
+        `Preparation step not found for this task. Recipe does not have preparation questions.`,
+      );
+    }
+
+    // Find the preparation step
+    const preparationStep = recipe.preparationQuestions.find(
+      (step) => step.id === preparationStepId,
+    );
+
+    if (!preparationStep) {
+      throw new NotFoundException(
+        `Preparation step not found for this task`,
+      );
+    }
+
+    // Find the question within the preparation step
+    if (!preparationStep.questions || preparationStep.questions.length === 0) {
+      throw new NotFoundException(
+        `Question not found in preparation step`,
+      );
+    }
+
+    const question = preparationStep.questions.find(
+      (q) => q.id === questionId,
+    );
+
+    if (!question) {
+      throw new NotFoundException(
+        `Question not found in preparation step`,
+      );
+    }
+
+    // Find existing status or create new one
+    let questionStatus = await this.preparationQuestionStatusRepository.findOne({
+      where: {
+        executionId: execution.id,
+        preparationStepId,
+        questionId,
+      },
+    });
+
+    if (questionStatus) {
+      // Update existing status
+      questionStatus.checked = dto.checked;
+      await this.preparationQuestionStatusRepository.save(questionStatus);
+      this.logger.log(
+        `updatePreparationQuestionStatus - Updated existing status: ${questionStatus.id}`,
+      );
+    } else {
+      // Create new status
+      questionStatus = this.preparationQuestionStatusRepository.create({
+        executionId: execution.id,
+        preparationStepId,
+        questionId,
+        checked: dto.checked,
+      });
+      await this.preparationQuestionStatusRepository.save(questionStatus);
+      this.logger.log(
+        `updatePreparationQuestionStatus - Created new status: ${questionStatus.id}`,
+      );
+    }
+
+    return {
+      statusCode: 200,
+      success: true,
+      message: 'Preparation question status updated successfully',
+      data: {
+        taskId: task.taskId,
+        preparationStepId,
+        questionId,
+        checked: questionStatus.checked,
+        updatedAt: questionStatus.updatedAt,
+      },
+    };
+  }
+
+  /**
+   * Get all preparation question statuses for an execution
+   */
+  async getPreparationQuestionStatuses(
+    executionId: string,
+  ): Promise<TaskRecipePreparationQuestionStatusEntity[]> {
+    return this.preparationQuestionStatusRepository.find({
+      where: { executionId },
+    });
+  }
+>>>>>>> origin/new-dev
 }
 

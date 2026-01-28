@@ -11,6 +11,10 @@ export class RawMaterialBatchCalculationsResponseDto {
   batch100kg: { cost: number; kg: number };
   batch150kg: { cost: number; kg: number };
   batch200kg: { cost: number; kg: number };
+<<<<<<< HEAD
+=======
+  batch250kg: { cost: number; kg: number };
+>>>>>>> origin/new-dev
 }
 
 export class RawMaterialResponseDto {

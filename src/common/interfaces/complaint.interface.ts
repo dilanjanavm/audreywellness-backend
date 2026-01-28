@@ -39,6 +39,14 @@ export interface UpdateComplaintDto {
 export interface UpdateComplaintStatusDto {
   status: ComplaintStatus;
   note?: string; // Optional note for the status change
+<<<<<<< HEAD
+=======
+  smsNotification?: {
+    send: boolean;
+    phoneNumber: string;
+    message: string;
+  };
+>>>>>>> origin/new-dev
 }
 
 export interface ComplaintResponseDto {

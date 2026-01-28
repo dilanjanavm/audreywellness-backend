@@ -26,7 +26,11 @@ export class RolesService {
     private permissionRepository: Repository<Permission>,
     @InjectRepository(RolePermission)
     private rolePermissionRepository: Repository<RolePermission>,
+<<<<<<< HEAD
   ) {}
+=======
+  ) { }
+>>>>>>> origin/new-dev
 
   /**
    * Create a new role
@@ -195,6 +199,12 @@ export class RolesService {
       throw new NotFoundException('One or more permissions not found');
     }
 
+<<<<<<< HEAD
+=======
+    // Remove existing permissions first to prevent duplicates (Replace existing set)
+    await this.rolePermissionRepository.delete({ roleId });
+
+>>>>>>> origin/new-dev
     // Create role-permission relationships
     const rolePermissions = permissionIds.map((permissionId) =>
       this.rolePermissionRepository.create({

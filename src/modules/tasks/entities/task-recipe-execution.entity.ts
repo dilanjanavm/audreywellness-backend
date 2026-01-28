@@ -10,6 +10,10 @@ import {
 } from 'typeorm';
 import { TaskEntity } from './task.entity';
 import { TaskRecipeStepExecutionEntity } from './task-recipe-step-execution.entity';
+<<<<<<< HEAD
+=======
+import { TaskRecipePreparationQuestionStatusEntity } from './task-recipe-preparation-question-status.entity';
+>>>>>>> origin/new-dev
 import { RecipeExecutionStatus } from '../../../common/enums/recipe-execution.enum';
 
 @Entity('task_recipe_executions')
@@ -67,7 +71,17 @@ export class TaskRecipeExecutionEntity {
   completedAt?: Date;
 
   // Total elapsed time (in minutes) - accumulated across pauses
+<<<<<<< HEAD
   @Column({ name: 'total_elapsed_time', type: 'int', default: 0 })
+=======
+  @Column({
+    name: 'total_elapsed_time',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
+>>>>>>> origin/new-dev
   totalElapsedTime: number;
 
   // Pause information
@@ -84,6 +98,16 @@ export class TaskRecipeExecutionEntity {
   )
   stepExecutions?: TaskRecipeStepExecutionEntity[];
 
+<<<<<<< HEAD
+=======
+  @OneToMany(
+    () => TaskRecipePreparationQuestionStatusEntity,
+    (questionStatus) => questionStatus.execution,
+    { cascade: true },
+  )
+  preparationQuestionStatuses?: TaskRecipePreparationQuestionStatusEntity[];
+
+>>>>>>> origin/new-dev
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

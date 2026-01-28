@@ -31,7 +31,11 @@ import {
 
 @Controller('costing')
 export class CostingController {
+<<<<<<< HEAD
   constructor(private readonly costingService: CostingService) {}
+=======
+  constructor(private readonly costingService: CostingService) { }
+>>>>>>> origin/new-dev
 
   /**
    * Create a new costing
@@ -134,6 +138,24 @@ export class CostingController {
   }
 
   /**
+<<<<<<< HEAD
+=======
+   * Delete all costings for an item
+   */
+  @Delete('item/:itemId')
+  async removeAllByItem(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+  ): Promise<{ message: string }> {
+    try {
+      await this.costingService.removeAllByItem(itemId);
+      return { message: 'All costings for item deleted successfully' };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+>>>>>>> origin/new-dev
    * Delete costing
    */
   @Delete(':id')

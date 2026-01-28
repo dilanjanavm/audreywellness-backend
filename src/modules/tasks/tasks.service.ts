@@ -65,15 +65,26 @@ export class TasksService {
 
   async listPhases(includeTasks = false, currentUser?: any): Promise<PhaseResponseDto[]> {
     this.logger.log(`listPhases - includeTasks: ${includeTasks}, User: ${currentUser?.userId || 'N/A'}`);
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/new-dev
     const phases = await this.phaseRepository.find({
       order: { order: 'ASC', createdAt: 'ASC' },
       relations: includeTasks
         ? [
+<<<<<<< HEAD
             'tasks',
             'tasks.assignedUser',
             'tasks.costing',
           ]
+=======
+          'tasks',
+          'tasks.assignedUser',
+          'tasks.costing',
+        ]
+>>>>>>> origin/new-dev
         : [],
     });
 
@@ -224,7 +235,11 @@ export class TasksService {
     data: TaskResponseDto[];
   }> {
     this.logger.log(`getPhaseTasks - Starting for phase: ${phaseId}`);
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/new-dev
     const phase = await this.phaseRepository.findOne({
       where: { id: phaseId },
     });
@@ -353,7 +368,11 @@ export class TasksService {
 
       // Check if taskId already exists and generate unique one if needed
       this.logger.debug(`createTask - Checking if taskId exists: ${taskId}`);
+<<<<<<< HEAD
       
+=======
+
+>>>>>>> origin/new-dev
       // If taskId was provided by user, check if it exists and throw error if it does
       if (dto.taskId) {
         const existingTaskId = await this.taskRepository.findOne({
@@ -371,7 +390,11 @@ export class TasksService {
         let existingTask = await this.taskRepository.findOne({
           where: { taskId },
         });
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> origin/new-dev
         while (existingTask && retries < 10) {
           this.logger.warn(
             `createTask - Generated taskId ${taskId} already exists, generating new one (retry ${retries + 1}/10)`,
@@ -382,7 +405,11 @@ export class TasksService {
           });
           retries++;
         }
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> origin/new-dev
         if (existingTask) {
           this.logger.error(
             `createTask - Unable to generate unique taskId after ${retries} retries`,
@@ -391,7 +418,11 @@ export class TasksService {
             'Unable to generate unique taskId. Please try again.',
           );
         }
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> origin/new-dev
         if (retries > 0) {
           this.logger.log(
             `createTask - Generated unique taskId after ${retries} retries: ${taskId}`,
@@ -535,7 +566,11 @@ export class TasksService {
 
       const response = this.mapTaskToResponseDto(taskWithRelations!);
       this.logger.debug(`createTask - Task response mapped: ${JSON.stringify(response, null, 2)}`);
+<<<<<<< HEAD
       
+=======
+
+>>>>>>> origin/new-dev
       return response;
     } catch (error) {
       this.logger.error(`createTask - Error creating task: ${error.message}`, error.stack);
@@ -707,24 +742,37 @@ export class TasksService {
     }
 
     const saved = await this.taskRepository.save(task);
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/new-dev
     // Reload task with relations for response
     const taskWithRelations = await this.taskRepository.findOne({
       where: { id: saved.id },
       relations: ['phase', 'assignedUser', 'costing'],
     });
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/new-dev
     return this.mapTaskToResponseDto(taskWithRelations!);
   }
 
   async deleteTask(identifier: string): Promise<void> {
     this.logger.debug(`deleteTask - Deleting task with identifier: ${identifier}`);
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/new-dev
     // Check if it's a UUID format
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       identifier,
     );
 
+<<<<<<< HEAD
     let result;
 
     if (isUuid) {
@@ -752,6 +800,60 @@ export class TasksService {
     }
 
     this.logger.log(`deleteTask - Task deleted successfully: ${identifier}`);
+=======
+    // Find the task first to handle relations
+    let task = await this.taskRepository.findOne({
+      where: isUuid ? { id: identifier } : { taskId: identifier },
+      relations: ['recipeExecution'],
+    });
+
+    if (!task) {
+      if (isUuid) {
+        task = await this.taskRepository.findOne({ where: { taskId: identifier }, relations: ['recipeExecution'] });
+      } else {
+        task = await this.taskRepository.findOne({ where: { id: identifier }, relations: ['recipeExecution'] });
+      }
+    }
+
+    if (!task) {
+      this.logger.warn(`deleteTask - Task not found with identifier: ${identifier}. Assuming already deleted.`);
+      // Idempotency: If task is not found, return success as the desired state (task gone) is achieved.
+      return;
+    }
+
+    this.logger.debug(`deleteTask - Found task to delete: ${task.id} (${task.taskId})`);
+
+    try {
+      // 1. Unlink Recipe Execution (Circular Dependency Break)
+      if (task.recipeExecution) {
+        this.logger.debug(`deleteTask - Unlinking recipe execution`);
+        // Bypass TS check for setting relation to null
+        await this.taskRepository.update(task.id, { recipeExecution: null } as any);
+
+        // 2. Delete Recipe Execution
+        this.logger.debug(`deleteTask - Deleting recipe execution`);
+        await this.recipeExecutionService.deleteExecution(task.id);
+      }
+
+      // 3. Delete Task Movement History (if not cascaded by DB)
+      // Safety check: manually delete to ensure no FK errors
+      this.logger.debug(`deleteTask - Cleaning up movement history`);
+      await this.movementHistoryRepository.delete({ task: { id: task.id } });
+
+      // 4. Delete Task Comments (if not cascaded by DB)
+      this.logger.debug(`deleteTask - Cleaning up comments`);
+      await this.commentRepository.delete({ task: { id: task.id } });
+
+      // 5. Delete Task
+      this.logger.debug(`deleteTask - Deleting task entity`);
+      await this.taskRepository.delete(task.id);
+
+      this.logger.log(`deleteTask - Task deleted successfully: ${identifier}`);
+    } catch (error) {
+      this.logger.error(`deleteTask - Error deleting task: ${error.message}`, error.stack);
+      throw new BadRequestException(`Failed to delete task: ${error.message}`);
+    }
+>>>>>>> origin/new-dev
   }
 
   async updateTaskPosition(
@@ -792,13 +894,21 @@ export class TasksService {
     exampleRequest: any;
   }> {
     this.logger.log(`getTaskTemplate - Getting template for phase: ${phaseId}`);
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/new-dev
     const phase = await this.findPhaseOrThrow(phaseId);
     const isFillingAndPacking = phase.name.toLowerCase() === 'filling & packing';
 
     // Base required fields for all phases
     const baseRequiredFields = ['task', 'phaseId', 'status'];
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/new-dev
     // Base optional fields for all phases
     const baseOptionalFields = [
       'taskId',
@@ -1068,10 +1178,17 @@ export class TasksService {
       ownerId: comment.ownerId,
       owner: comment.owner
         ? {
+<<<<<<< HEAD
             id: comment.owner.id,
             userName: comment.owner.userName,
             email: comment.owner.email,
           }
+=======
+          id: comment.owner.id,
+          userName: comment.owner.userName,
+          email: comment.owner.email,
+        }
+>>>>>>> origin/new-dev
         : undefined,
       ownerName: comment.ownerName,
       ownerEmail: comment.ownerEmail,
@@ -1227,10 +1344,17 @@ export class TasksService {
       movedByName: movement.movedByName,
       movedByUser: movement.movedByUser
         ? {
+<<<<<<< HEAD
             id: movement.movedByUser.id,
             userName: movement.movedByUser.userName,
             email: movement.movedByUser.email,
           }
+=======
+          id: movement.movedByUser.id,
+          userName: movement.movedByUser.userName,
+          email: movement.movedByUser.email,
+        }
+>>>>>>> origin/new-dev
         : undefined,
       reason: movement.reason,
       movedAt: movement.movedAt,
@@ -1306,14 +1430,22 @@ export class TasksService {
 
     const profile = hasStoredProfileData
       ? {
+<<<<<<< HEAD
           id: task.assigneeId ?? fallbackProfile?.id ?? '',
           name: task.assigneeName ?? fallbackProfile?.name ?? '',
           role: task.assigneeRole ?? fallbackProfile?.role,
         }
+=======
+        id: task.assigneeId ?? fallbackProfile?.id ?? '',
+        name: task.assigneeName ?? fallbackProfile?.name ?? '',
+        role: task.assigneeRole ?? fallbackProfile?.role,
+      }
+>>>>>>> origin/new-dev
       : fallbackProfile;
 
     const phaseId = phaseOverrideId ?? task.phaseId ?? task.phase?.id ?? '';
 
+<<<<<<< HEAD
       return {
         id: task.id,
         taskId: task.taskId,
@@ -1367,6 +1499,61 @@ export class TasksService {
         courierNumber: task.courierNumber,
         courierService: task.courierService,
       };
+=======
+    return {
+      id: task.id,
+      taskId: task.taskId,
+      phaseId,
+      status: task.status,
+      order: task.order,
+      task: task.task,
+      description: task.description,
+      priority: task.priority,
+      startDate: task.startDate,
+      dueDate: task.dueDate,
+      assignee: profile,
+      assignedUserId: task.assignedUserId,
+      assignedUser: task.assignedUser
+        ? {
+          id: task.assignedUser.id,
+          userName: task.assignedUser.userName,
+          email: task.assignedUser.email,
+        }
+        : undefined,
+      costingId: task.costingId,
+      costing: task.costing
+        ? {
+          id: task.costing.id,
+          itemName: task.costing.itemName,
+          itemCode: task.costing.itemCode,
+          version: task.costing.version,
+          isActive: task.costing.isActive,
+        }
+        : undefined,
+      batchSize: task.batchSize,
+      rawMaterials: task.rawMaterials,
+      comments: task.comments,
+      commentList: task.commentList
+        ? task.commentList
+          .sort(
+            (a, b) =>
+              b.commentedDate.getTime() - a.commentedDate.getTime(),
+          )
+          .map((comment) => this.mapCommentToResponseDto(comment))
+        : undefined,
+      views: task.views,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      updatedBy: task.updatedBy,
+      // Optional template fields
+      orderNumber: task.orderNumber,
+      customerName: task.customerName,
+      customerMobile: task.customerMobile,
+      customerAddress: task.customerAddress,
+      courierNumber: task.courierNumber,
+      courierService: task.courierService,
+    };
+>>>>>>> origin/new-dev
   }
 
   /**
@@ -1637,10 +1824,17 @@ export class TasksService {
       ownerId: comment.ownerId,
       owner: comment.owner
         ? {
+<<<<<<< HEAD
             id: comment.owner.id,
             userName: comment.owner.userName,
             email: comment.owner.email,
           }
+=======
+          id: comment.owner.id,
+          userName: comment.owner.userName,
+          email: comment.owner.email,
+        }
+>>>>>>> origin/new-dev
         : undefined,
       ownerName: comment.ownerName,
       ownerEmail: comment.ownerEmail,
@@ -1757,11 +1951,19 @@ export class TasksService {
       userId: comment.ownerId,
       user: comment.owner
         ? {
+<<<<<<< HEAD
             id: comment.owner.id,
             userName: comment.owner.userName,
             email: comment.owner.email,
             avatar: undefined, // Add if available
           }
+=======
+          id: comment.owner.id,
+          userName: comment.owner.userName,
+          email: comment.owner.email,
+          avatar: undefined, // Add if available
+        }
+>>>>>>> origin/new-dev
         : undefined,
       content: comment.comment,
       createdAt: comment.commentedDate || comment.createdAt,
@@ -1835,10 +2037,22 @@ export class TasksService {
         const executionStatus = await this.recipeExecutionService.getExecutionStatus(
           task.taskId,
         );
+<<<<<<< HEAD
         
         // Get full recipe for recipeExecution.recipe
         const fullRecipe = executionStatus.recipe || recipe;
         
+=======
+
+        // Get checklist statuses
+        const prepStatuses = await this.recipeExecutionService.getPreparationQuestionStatuses(
+          executionStatus.id,
+        );
+
+        // Get full recipe for recipeExecution.recipe
+        const fullRecipe = executionStatus.recipe || recipe;
+
+>>>>>>> origin/new-dev
         // Format recipeExecution to match frontend expectations
         recipeExecution = {
           id: executionStatus.id,
@@ -1847,11 +2061,19 @@ export class TasksService {
           status: executionStatus.status,
           currentStep: executionStatus.currentStep
             ? {
+<<<<<<< HEAD
                 stepOrder: executionStatus.currentStep.stepOrder,
                 startedAt: executionStatus.currentStep.startedAt,
                 progress: executionStatus.currentStep.progress,
                 elapsedTime: executionStatus.currentStep.elapsedTime,
               }
+=======
+              stepOrder: executionStatus.currentStep.stepOrder,
+              startedAt: executionStatus.currentStep.startedAt,
+              progress: executionStatus.currentStep.progress,
+              elapsedTime: executionStatus.currentStep.elapsedTime,
+            }
+>>>>>>> origin/new-dev
             : null,
           overallProgress: executionStatus.overallProgress,
           elapsedTime: executionStatus.elapsedTime,
@@ -1874,6 +2096,7 @@ export class TasksService {
           })),
           recipe: fullRecipe
             ? {
+<<<<<<< HEAD
                 id: fullRecipe.id,
                 name: fullRecipe.name,
                 steps: (fullRecipe.steps || [])
@@ -1887,6 +2110,38 @@ export class TasksService {
                   })),
                 totalTime: fullRecipe.totalTime,
               }
+=======
+              id: fullRecipe.id,
+              name: fullRecipe.name,
+              steps: (fullRecipe.steps || [])
+                .sort((a, b) => a.order - b.order)
+                .map((step) => ({
+                  id: step.id,
+                  order: step.order,
+                  instruction: step.instruction,
+                  temperature: step.temperature,
+                  duration: step.duration,
+                })),
+              preparationQuestions: fullRecipe.preparationQuestions
+                ? fullRecipe.preparationQuestions.map((pq) => ({
+                  id: pq.id,
+                  order: pq.order,
+                  questions: pq.questions.map((q) => {
+                    const status = prepStatuses.find(
+                      (s) => s.questionId === q.id && s.preparationStepId === pq.id,
+                    );
+                    return {
+                      id: q.id,
+                      question: q.question,
+                      hasCheckbox: q.hasCheckbox,
+                      checked: status ? status.checked : false,
+                    };
+                  }),
+                }))
+                : [],
+              totalTime: fullRecipe.totalTime,
+            }
+>>>>>>> origin/new-dev
             : null,
           createdAt: task.createdAt,
           updatedAt: task.updatedAt,
@@ -1900,7 +2155,11 @@ export class TasksService {
       // If no execution but recipe exists, create a not_started execution object
       // with stepExecutions for all recipe steps (pending status)
       const sortedSteps = (recipe.steps || []).sort((a, b) => a.order - b.order);
+<<<<<<< HEAD
       
+=======
+
+>>>>>>> origin/new-dev
       recipeExecution = {
         id: null,
         taskId: task.id,
@@ -1936,6 +2195,21 @@ export class TasksService {
             temperature: step.temperature,
             duration: step.duration,
           })),
+<<<<<<< HEAD
+=======
+          preparationQuestions: recipe.preparationQuestions
+            ? recipe.preparationQuestions.map((pq) => ({
+              id: pq.id,
+              order: pq.order,
+              questions: pq.questions.map((q) => ({
+                id: q.id,
+                question: q.question,
+                hasCheckbox: q.hasCheckbox,
+                checked: false,
+              })),
+            }))
+            : [],
+>>>>>>> origin/new-dev
           totalTime: recipe.totalTime,
         },
         createdAt: task.createdAt,
