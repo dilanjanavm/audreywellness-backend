@@ -3,10 +3,7 @@ import {
   IsUUID,
   IsNumber,
   IsString,
-<<<<<<< HEAD
-=======
   IsBoolean,
->>>>>>> origin/new-dev
   Min,
   Max,
 } from 'class-validator';
@@ -76,14 +73,11 @@ export class ResumeExecutionDto {
   remainingTime?: number; // Remaining time for current step in minutes (from frontend timer, optional)
 }
 
-<<<<<<< HEAD
-=======
 export class UpdatePreparationQuestionStatusDto {
   @IsBoolean()
   checked: boolean; // true to mark as checked, false to mark as unchecked
 }
 
->>>>>>> origin/new-dev
 // Response DTOs
 export class StepExecutionStatusDto {
   id: string;

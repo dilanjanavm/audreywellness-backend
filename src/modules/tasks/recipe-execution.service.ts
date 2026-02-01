@@ -9,10 +9,7 @@ import { Repository } from 'typeorm';
 import { TaskEntity } from './entities/task.entity';
 import { TaskRecipeExecutionEntity } from './entities/task-recipe-execution.entity';
 import { TaskRecipeStepExecutionEntity } from './entities/task-recipe-step-execution.entity';
-<<<<<<< HEAD
-=======
 import { TaskRecipePreparationQuestionStatusEntity } from './entities/task-recipe-preparation-question-status.entity';
->>>>>>> origin/new-dev
 import {
   RecipeExecutionStatus,
   StepExecutionStatus,
@@ -25,10 +22,7 @@ import {
   StepExecutionStatusDto,
   PauseExecutionDto,
   ResumeExecutionDto,
-<<<<<<< HEAD
-=======
   UpdatePreparationQuestionStatusDto,
->>>>>>> origin/new-dev
 } from './dto/recipe-execution.dto';
 import { RecipesService } from '../recipes/recipes.service';
 import { RecipeStep } from '../recipes/entities/recipe-step.entity';
@@ -45,15 +39,10 @@ export class RecipeExecutionService {
     private readonly executionRepository: Repository<TaskRecipeExecutionEntity>,
     @InjectRepository(TaskRecipeStepExecutionEntity)
     private readonly stepExecutionRepository: Repository<TaskRecipeStepExecutionEntity>,
-<<<<<<< HEAD
-    private readonly recipesService: RecipesService,
-  ) {}
-=======
     @InjectRepository(TaskRecipePreparationQuestionStatusEntity)
     private readonly preparationQuestionStatusRepository: Repository<TaskRecipePreparationQuestionStatusEntity>,
     private readonly recipesService: RecipesService,
   ) { }
->>>>>>> origin/new-dev
 
   /**
    * Find or create recipe execution for a task
@@ -748,8 +737,6 @@ export class RecipeExecutionService {
   }
 
   /**
-<<<<<<< HEAD
-=======
    * Delete recipe execution (used when deleting a task)
    */
   /**
@@ -781,7 +768,6 @@ export class RecipeExecutionService {
   }
 
   /**
->>>>>>> origin/new-dev
    * Get execution by task ID
    */
   private async getExecutionByTaskId(
@@ -823,11 +809,7 @@ export class RecipeExecutionService {
     // Find current step details and calculate elapsed time
     let currentStep: RecipeExecutionStatusDto['currentStep'] | undefined;
     let currentStepElapsedTime: number | undefined;
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> origin/new-dev
     if (execution.currentStepId && execution.currentStepOrder) {
       const currentStepExecution = stepExecutions.find(
         (se) => se.recipeStepId === execution.currentStepId,
@@ -970,8 +952,6 @@ export class RecipeExecutionService {
       stepExecutions: stepExecutionDtos,
     };
   }
-<<<<<<< HEAD
-=======
 
   /**
    * Update preparation question checkbox status
@@ -1126,6 +1106,5 @@ export class RecipeExecutionService {
       where: { executionId },
     });
   }
->>>>>>> origin/new-dev
 }
 

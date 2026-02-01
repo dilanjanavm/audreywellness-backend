@@ -30,11 +30,7 @@ export class SeedService {
     @InjectRepository(TaskTemplateEntity)
     private readonly templateRepository: Repository<TaskTemplateEntity>,
     private readonly dataSource: DataSource,
-<<<<<<< HEAD
-  ) {}
-=======
   ) { }
->>>>>>> origin/new-dev
 
   async run() {
     this.logger.log('Starting database seeding...');
@@ -127,15 +123,12 @@ export class SeedService {
       { name: 'Update Complaint', code: 'COMPLAINT_UPDATE', module: 'complaints', description: 'Permission to update complaints' },
       { name: 'Delete Complaint', code: 'COMPLAINT_DELETE', module: 'complaints', description: 'Permission to delete complaints' },
       { name: 'View Complaint', code: 'COMPLAINT_VIEW', module: 'complaints', description: 'Permission to view complaints' },
-<<<<<<< HEAD
-=======
 
       // Recipe Management Permissions
       { name: 'Create Recipe', code: 'RECIPE_CREATE', module: 'recipes', description: 'Permission to create recipes' },
       { name: 'Update Recipe', code: 'RECIPE_UPDATE', module: 'recipes', description: 'Permission to update recipes' },
       { name: 'Delete Recipe', code: 'RECIPE_DELETE', module: 'recipes', description: 'Permission to delete recipes' },
       { name: 'View Recipe', code: 'RECIPE_VIEW', module: 'recipes', description: 'Permission to view recipes' },
->>>>>>> origin/new-dev
     ];
 
     const createdPermissions: Permission[] = [];
@@ -242,11 +235,7 @@ export class SeedService {
 
     if (existingAdmin) {
       this.logger.log('⚠️  Admin user already exists. Updating role if needed...');
-<<<<<<< HEAD
-      
-=======
 
->>>>>>> origin/new-dev
       // Update existing admin to have Super Admin role
       if (existingAdmin.roleId !== superAdminRole.id) {
         existingAdmin.roleId = superAdminRole.id;

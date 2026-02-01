@@ -2,41 +2,6 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { UserRole } from '../enums/user-role.enum';
-<<<<<<< HEAD
-
-@Injectable()
-export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
-
-  canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.get<UserRole[]>(
-      'roles',
-      context.getHandler(),
-    );
-
-    if (!requiredRoles) {
-      return true;
-    }
-
-    const { user } = context.switchToHttp().getRequest();
-
-    if (!user) {
-      return false;
-    }
-
-    // FIX: Handle both 'role' (string) and 'roles' (array) formats
-    const userRoles = user.roles || [user.role];
-    
-    // Normalize role comparison - convert to lowercase for case-insensitive matching
-    const normalizedUserRoles = userRoles.map((r: string) => 
-      typeof r === 'string' ? r.toLowerCase() : r
-    );
-    const normalizedRequiredRoles = requiredRoles.map((r) => r.toLowerCase());
-
-    return normalizedRequiredRoles.some((role) => 
-      normalizedUserRoles.includes(role)
-    );
-=======
 import { ROLES_KEY } from '../decorators/roles.decorator';
 
 @Injectable()
@@ -53,6 +18,5 @@ export class RolesGuard implements CanActivate {
     }
     const { user } = context.switchToHttp().getRequest();
     return requiredRoles.some((role) => user.roles?.includes(role));
->>>>>>> origin/new-dev
   }
 }

@@ -45,11 +45,7 @@ export class ItemManagementService {
     @InjectRepository(CategoryEntity)
     private readonly categoryRepository: Repository<CategoryEntity>,
     private readonly categoryService: CategoryService,
-<<<<<<< HEAD
-  ) {}
-=======
   ) { }
->>>>>>> origin/new-dev
 
   // ========== CRUD OPERATIONS ==========
 
@@ -762,8 +758,6 @@ export class ItemManagementService {
   }
 
   /**
-<<<<<<< HEAD
-=======
    * Find items with pagination (DB level)
    */
   async findWithPagination(
@@ -832,7 +826,6 @@ export class ItemManagementService {
   }
 
   /**
->>>>>>> origin/new-dev
    * Get item statistics
    */
   async getStats(): Promise<{

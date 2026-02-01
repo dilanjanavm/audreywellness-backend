@@ -31,11 +31,7 @@ import {
 
 @Controller('costing')
 export class CostingController {
-<<<<<<< HEAD
-  constructor(private readonly costingService: CostingService) {}
-=======
   constructor(private readonly costingService: CostingService) { }
->>>>>>> origin/new-dev
 
   /**
    * Create a new costing
@@ -138,8 +134,6 @@ export class CostingController {
   }
 
   /**
-<<<<<<< HEAD
-=======
    * Delete all costings for an item
    */
   @Delete('item/:itemId')
@@ -155,7 +149,6 @@ export class CostingController {
   }
 
   /**
->>>>>>> origin/new-dev
    * Delete costing
    */
   @Delete(':id')

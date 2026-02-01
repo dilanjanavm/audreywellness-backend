@@ -25,10 +25,7 @@ import {
   ComplaintStatus,
   PriorityLevel,
 } from '../../common/enums/complain.enum';
-<<<<<<< HEAD
-=======
 import { SendlkApiService } from '../sms/services/sendlk-api.service';
->>>>>>> origin/new-dev
 
 @Injectable()
 export class ComplaintService {
@@ -39,12 +36,8 @@ export class ComplaintService {
     private readonly timelineRepository: Repository<ComplaintTimelineEntity>,
     private readonly customerService: CustomerService,
     private readonly userService: UsersService,
-<<<<<<< HEAD
-  ) {}
-=======
     private readonly sendlkApiService: SendlkApiService, // Injected
   ) { }
->>>>>>> origin/new-dev
 
   async generateComplaintNumber(): Promise<string> {
     const lastComplaint = await this.complaintRepository.findOne({
@@ -421,8 +414,6 @@ export class ComplaintService {
         );
       }
 
-<<<<<<< HEAD
-=======
       // Handle SMS Notification
       if (updateStatusDto.smsNotification?.send) {
         await this.createTimelineEntry(
@@ -433,7 +424,6 @@ export class ComplaintService {
         );
       }
 
->>>>>>> origin/new-dev
       const updatedComplaint = await this.complaintRepository.save({
         ...complaint,
         ...updateData,
@@ -597,8 +587,6 @@ export class ComplaintService {
     }
   }
 
-<<<<<<< HEAD
-=======
   async sendSmsNotification(
     id: string,
     phoneNumber: string,
@@ -625,7 +613,6 @@ export class ComplaintService {
     }
   }
 
->>>>>>> origin/new-dev
   private mapToResponseDto(complaint: ComplaintEntity): ComplaintResponseDto {
     return {
       id: complaint.id,

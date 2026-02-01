@@ -2,19 +2,13 @@ import {
   Controller,
   Get,
   Post,
-<<<<<<< HEAD
-=======
   Patch,
->>>>>>> origin/new-dev
   Param,
   Body,
   UseGuards,
   Logger,
   ParseIntPipe,
-<<<<<<< HEAD
-=======
   ParseUUIDPipe,
->>>>>>> origin/new-dev
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RecipeExecutionService } from './recipe-execution.service';
@@ -25,10 +19,7 @@ import {
   RecipeExecutionStatusDto,
   PauseExecutionDto,
   ResumeExecutionDto,
-<<<<<<< HEAD
-=======
   UpdatePreparationQuestionStatusDto,
->>>>>>> origin/new-dev
 } from './dto/recipe-execution.dto';
 
 @Controller('tasks/:taskId/recipe')
@@ -136,8 +127,6 @@ export class RecipeExecutionController {
     this.logger.log(`Cancelling recipe execution for task: ${taskId}`);
     return this.recipeExecutionService.cancelExecution(taskId);
   }
-<<<<<<< HEAD
-=======
 
   /**
    * Update preparation question checkbox status
@@ -171,6 +160,5 @@ export class RecipeExecutionController {
       dto,
     );
   }
->>>>>>> origin/new-dev
 }
 

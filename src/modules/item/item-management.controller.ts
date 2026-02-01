@@ -24,13 +24,9 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import express from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-<<<<<<< HEAD
-import { Roles } from '../../common/decorators/roles.decorator';
-=======
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
->>>>>>> origin/new-dev
 import { UserRole } from '../../common/enums/user-role.enum';
 import { ItemManagementService } from './item-management.service';
 import * as itemInterface from '../../common/interfaces/item.interface';
@@ -41,15 +37,9 @@ import {
 import { Response } from 'express';
 
 @Controller('items')
-<<<<<<< HEAD
-@UseGuards(JwtAuthGuard, RolesGuard)
-export class ItemManagementController {
-  constructor(private readonly itemService: ItemManagementService) {}
-=======
 @UseGuards(JwtAuthGuard)
 export class ItemManagementController {
   constructor(private readonly itemService: ItemManagementService) { }
->>>>>>> origin/new-dev
 
   // ========== BASIC CRUD ENDPOINTS ==========
 
@@ -58,10 +48,7 @@ export class ItemManagementController {
    */
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_CREATE')
->>>>>>> origin/new-dev
   async create(
     @Body() createItemDto: itemInterface.CreateItemDto,
   ): Promise<{ message: string; data: itemInterface.ItemResponseDto }> {
@@ -83,10 +70,7 @@ export class ItemManagementController {
    */
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_VIEW')
->>>>>>> origin/new-dev
   async findAll(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number = 50,
@@ -128,8 +112,6 @@ export class ItemManagementController {
   }
 
   /**
-<<<<<<< HEAD
-=======
    * Get all items with pagination (DB optimized)
    */
   @Get('paginated')
@@ -170,15 +152,11 @@ export class ItemManagementController {
   }
 
   /**
->>>>>>> origin/new-dev
    * Get item by item code
    */
   @Get(':itemCode')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_VIEW')
->>>>>>> origin/new-dev
   async findOne(
     @Param('itemCode') itemCode: string,
     @Query('includeSuppliers', new DefaultValuePipe(false), ParseBoolPipe)
@@ -198,10 +176,7 @@ export class ItemManagementController {
    */
   @Put(':itemCode')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_UPDATE')
->>>>>>> origin/new-dev
   async update(
     @Param('itemCode') itemCode: string,
     @Body() updateItemDto: itemInterface.UpdateItemDto,
@@ -223,10 +198,7 @@ export class ItemManagementController {
    */
   @Delete(':itemCode')
   @Roles(UserRole.ADMIN)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_DELETE')
->>>>>>> origin/new-dev
   async remove(
     @Param('itemCode') itemCode: string,
   ): Promise<{ message: string }> {
@@ -246,10 +218,7 @@ export class ItemManagementController {
    */
   @Post('bulk-remove')
   @Roles(UserRole.ADMIN)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_DELETE')
->>>>>>> origin/new-dev
   async bulkRemove(
     @Body('itemCodes', ParseArrayPipe) itemCodes: string[],
   ): Promise<{ message: string; deletedCount: number }> {
@@ -276,10 +245,7 @@ export class ItemManagementController {
    */
   @Get(':itemCode/suppliers')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_VIEW', 'SUPPLIER_VIEW')
->>>>>>> origin/new-dev
   async getItemSuppliers(
     @Param('itemCode') itemCode: string,
   ): Promise<{ data: any[] }> {
@@ -297,10 +263,7 @@ export class ItemManagementController {
    */
   @Post(':itemCode/suppliers')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_UPDATE')
->>>>>>> origin/new-dev
   async addSuppliersToItem(
     @Param('itemCode') itemCode: string,
     @Body() body: { supplierIds: string[] },
@@ -334,10 +297,7 @@ export class ItemManagementController {
    */
   @Delete(':itemCode/suppliers')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_UPDATE')
->>>>>>> origin/new-dev
   async removeSuppliersFromItem(
     @Param('itemCode') itemCode: string,
     @Body() body: { supplierIds: string[] },
@@ -371,10 +331,7 @@ export class ItemManagementController {
    */
   @Get('supplier/:supplierId/items')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_VIEW')
->>>>>>> origin/new-dev
   async getItemsBySupplier(
     @Param('supplierId') supplierId: string,
   ): Promise<{ data: itemInterface.ItemResponseDto[] }> {
@@ -394,10 +351,7 @@ export class ItemManagementController {
    */
   @Post('import')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_CREATE')
->>>>>>> origin/new-dev
   async importFromCSV(
     @Body('csvContent') csvContent: string,
   ): Promise<CSVImportResult> {
@@ -422,10 +376,7 @@ export class ItemManagementController {
    */
   @Post('import/upload')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_CREATE')
->>>>>>> origin/new-dev
   @UseInterceptors(FileInterceptor('file'))
   async importFromCSVFile(
     @UploadedFile() file: Express.Multer.File,
@@ -467,10 +418,7 @@ export class ItemManagementController {
    */
   @Get('export/csv')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_VIEW')
->>>>>>> origin/new-dev
   async exportToCSV(
     @Query('includeHeaders', new DefaultValuePipe(true), ParseBoolPipe)
     includeHeaders?: boolean,
@@ -509,10 +457,7 @@ export class ItemManagementController {
 
   @Post('categories/items')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_VIEW')
->>>>>>> origin/new-dev
   async findByCategoryIds(
     @Body() body: { categoryIds: string[] },
   ): Promise<{ data: itemInterface.ItemResponseDto[] }> {
@@ -547,10 +492,7 @@ export class ItemManagementController {
    */
   @Get('export/template')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_View')
->>>>>>> origin/new-dev
   downloadTemplate(@Res() res: express.Response): void {
     // eslint-disable-next-line no-useless-catch
     try {
@@ -609,10 +551,7 @@ export class ItemManagementController {
    */
   @Get('search/:term')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_VIEW')
->>>>>>> origin/new-dev
   async search(
     @Param('term') searchTerm: string,
   ): Promise<{ data: itemInterface.ItemResponseDto[] }> {
@@ -634,10 +573,7 @@ export class ItemManagementController {
    */
   @Get('category/:category/items')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_VIEW')
->>>>>>> origin/new-dev
   async findByCategory(
     @Param('category') category: string,
   ): Promise<{ data: itemInterface.ItemResponseDto[] }> {
@@ -655,10 +591,7 @@ export class ItemManagementController {
    */
   @Get('categories/all')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_VIEW', 'CATEGORY_VIEW')
->>>>>>> origin/new-dev
   async getAllCategories(): Promise<{ data: string[] }> {
     // eslint-disable-next-line no-useless-catch
     try {
@@ -679,10 +612,7 @@ export class ItemManagementController {
    */
   @Get('stats/overview')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_VIEW')
->>>>>>> origin/new-dev
   async getStats(): Promise<{
     data: {
       totalItems: number;
@@ -704,10 +634,7 @@ export class ItemManagementController {
    */
   @Get('stats/categories')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
-<<<<<<< HEAD
-=======
   @Permissions('ITEM_VIEW')
->>>>>>> origin/new-dev
   async getCategoryStats(): Promise<{
     data: Array<{ category: string; count: number }>;
   }> {
