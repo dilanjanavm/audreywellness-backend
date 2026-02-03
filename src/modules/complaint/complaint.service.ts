@@ -613,6 +613,29 @@ export class ComplaintService {
     }
   }
 
+  async getPublicComplaintStatus(complaintNumber: string): Promise<ComplaintResponseDto> {
+    try {
+      const complaint = await this.complaintRepository.findOne({
+        where: { complaintNumber },
+        relations: [
+          'customer',
+          'assignedTo',
+          'timelineEntries',
+          'timelineEntries.createdBy',
+        ],
+      });
+
+      if (!complaint) {
+        throw new NotFoundException(`Complaint with number ${complaintNumber} not found`);
+      }
+
+      return this.mapToResponseDto(complaint);
+    } catch (error) {
+      console.error('Error in getPublicComplaintStatus:', error);
+      throw error;
+    }
+  }
+
   private mapToResponseDto(complaint: ComplaintEntity): ComplaintResponseDto {
     return {
       id: complaint.id,

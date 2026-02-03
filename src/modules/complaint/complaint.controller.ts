@@ -26,6 +26,7 @@ import {
   ComplaintStatus,
   PriorityLevel,
 } from 'src/common/enums/complain.enum';
+import { Public } from '../../common/decorators/public.decorator';
 
 @Controller('complaints')
 @UseGuards(JwtAuthGuard)
@@ -170,5 +171,13 @@ export class ComplaintController {
       message,
       req.user.userId,
     );
+  }
+
+  @Get('public/status/:complaintNumber')
+  @Public()
+  async getPublicComplaintStatus(
+    @Param('complaintNumber') complaintNumber: string,
+  ): Promise<complaintInterface.ComplaintResponseDto> {
+    return this.complaintService.getPublicComplaintStatus(complaintNumber);
   }
 }
