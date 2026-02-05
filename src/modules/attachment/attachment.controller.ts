@@ -18,20 +18,23 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import express from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { AttachmentService } from './attachment.service';
 import { AttachmentResponseDto } from '../../common/interfaces/attachment.interface';
 import { AttachmentType } from './entities/attachment.entity';
 
 @Controller('attachments')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class AttachmentController {
-  constructor(private readonly attachmentService: AttachmentService) {}
+  constructor(private readonly attachmentService: AttachmentService) { }
 
   // ✅ GENERIC FILE UPLOAD - No reason/entity required
   @Post('upload')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('ATTACHMENT_CREATE')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
     @UploadedFile() file: Express.Multer.File,
@@ -52,6 +55,7 @@ export class AttachmentController {
   // ✅ GET ALL GENERIC UPLOADS (files without complaint/customer association)
   @Get('uploads/generic')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('ATTACHMENT_VIEW')
   async getGenericUploads(): Promise<AttachmentResponseDto[]> {
     return this.attachmentService.getGenericUploads();
   }
@@ -59,6 +63,7 @@ export class AttachmentController {
   // ✅ GET ALL UPLOADS (both generic and entity-specific)
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('ATTACHMENT_VIEW')
   async getAllUploads(): Promise<AttachmentResponseDto[]> {
     return this.attachmentService.getAllUploads();
   }
@@ -66,6 +71,7 @@ export class AttachmentController {
   // ✅ UPLOAD FILE FOR COMPLAINT
   @Post('complaint/:complaintId')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('ATTACHMENT_CREATE')
   @UseInterceptors(FileInterceptor('file'))
   async uploadComplaintAttachment(
     @Param('complaintId', ParseUUIDPipe) complaintId: string,
@@ -88,6 +94,7 @@ export class AttachmentController {
   // ✅ GET ATTACHMENTS FOR SPECIFIC COMPLAINT
   @Get('complaint/:complaintId')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('ATTACHMENT_VIEW')
   async getComplaintAttachments(
     @Param('complaintId', ParseUUIDPipe) complaintId: string,
   ): Promise<AttachmentResponseDto[]> {
@@ -97,6 +104,7 @@ export class AttachmentController {
   // ✅ DOWNLOAD ATTACHMENT
   @Get(':id/download')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('ATTACHMENT_VIEW')
   async downloadAttachment(
     @Param('id', ParseUUIDPipe) id: string,
     @Res() res: express.Response,
@@ -116,6 +124,7 @@ export class AttachmentController {
   // ✅ PREVIEW ATTACHMENT (especially for images)
   @Get(':id/preview')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('ATTACHMENT_VIEW')
   async previewAttachment(
     @Param('id', ParseUUIDPipe) id: string,
     @Res() res: express.Response,
@@ -145,6 +154,7 @@ export class AttachmentController {
   // ✅ GET SINGLE ATTACHMENT INFO
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('ATTACHMENT_VIEW')
   async getAttachment(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<AttachmentResponseDto> {
@@ -155,6 +165,7 @@ export class AttachmentController {
   // ✅ DELETE ATTACHMENT
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('ATTACHMENT_DELETE')
   async deleteAttachment(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ message: string }> {

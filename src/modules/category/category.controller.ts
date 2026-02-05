@@ -11,20 +11,26 @@ import {
   HttpCode,
   HttpStatus,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 import { CategoryService } from './category.service';
 import * as categoryInterface from '../../common/interfaces/category.interface';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 
 @Controller('categories')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @UseFilters(HttpExceptionFilter)
 @UseInterceptors(TransformInterceptor)
 export class CategoryController {
-  constructor(private readonly categoryService: CategoryService) {}
+  constructor(private readonly categoryService: CategoryService) { }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @Permissions('CATEGORY_CREATE')
   async create(
     @Body() createCategoryDto: categoryInterface.CreateCategoryDto,
   ): Promise<{ data: categoryInterface.CategoryResponseDto }> {
@@ -34,6 +40,7 @@ export class CategoryController {
 
   @Get()
   @HttpCode(HttpStatus.OK)
+  @Permissions('CATEGORY_VIEW')
   async findAll(): Promise<{ data: categoryInterface.CategoryResponseDto[] }> {
     const categories = await this.categoryService.findAll();
     return { data: categories };
@@ -41,6 +48,7 @@ export class CategoryController {
 
   @Get(':categoryId')
   @HttpCode(HttpStatus.OK)
+  @Permissions('CATEGORY_VIEW')
   async findOne(
     @Param('categoryId') categoryId: string,
   ): Promise<{ data: categoryInterface.CategoryResponseDto }> {
@@ -50,6 +58,7 @@ export class CategoryController {
 
   @Put(':categoryId')
   @HttpCode(HttpStatus.OK)
+  @Permissions('CATEGORY_UPDATE')
   async update(
     @Param('categoryId') categoryId: string,
     @Body() updateCategoryDto: categoryInterface.UpdateCategoryDto,
@@ -63,6 +72,7 @@ export class CategoryController {
 
   @Delete(':categoryId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Permissions('CATEGORY_DELETE')
   async remove(@Param('categoryId') categoryId: string): Promise<void> {
     await this.categoryService.remove(categoryId);
   }

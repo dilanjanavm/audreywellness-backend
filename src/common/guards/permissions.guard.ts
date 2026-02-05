@@ -32,8 +32,13 @@ export class PermissionsGuard implements CanActivate {
             typeof r === 'string' ? r.toLowerCase() : r
         );
 
-        // Check for Super Admin
-        if (normalizedUserRoles.includes('super_admin') || normalizedUserRoles.includes('super admin')) {
+        // Check for Super Admin and Admin
+        if (
+            normalizedUserRoles.includes(UserRole.SUPER_ADMIN) ||
+            normalizedUserRoles.includes('super admin') ||
+            normalizedUserRoles.includes(UserRole.ADMIN) ||
+            normalizedUserRoles.includes('admin')
+        ) {
             return true;
         }
 

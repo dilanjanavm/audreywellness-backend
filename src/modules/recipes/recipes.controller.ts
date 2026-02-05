@@ -18,7 +18,9 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { RecipesService } from './recipes.service';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
@@ -27,17 +29,18 @@ import { RecipeQueryDto } from './dto/recipe-query.dto';
 import { RecipeResponseDto, RecipeVersionHistoryDto } from './dto/recipe-response.dto';
 
 @Controller('recipes')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class RecipesController {
   private readonly logger = new Logger(RecipesController.name);
 
-  constructor(private readonly recipesService: RecipesService) {}
+  constructor(private readonly recipesService: RecipesService) { }
 
   /**
    * Create a new recipe
    */
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('RECIPE_CREATE')
   async create(
     @Body() createRecipeDto: CreateRecipeDto,
     @Request() req,
@@ -60,6 +63,7 @@ export class RecipesController {
    */
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('RECIPE_VIEW')
   async findAll(
     @Query() query: RecipeQueryDto,
   ): Promise<{
@@ -83,6 +87,7 @@ export class RecipesController {
    */
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('RECIPE_VIEW')
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('includeVersions', new DefaultValuePipe(false), ParseBoolPipe) includeVersions?: boolean,
@@ -102,6 +107,7 @@ export class RecipesController {
    */
   @Get('product/:productId/batch/:batchSize/versions')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('RECIPE_VIEW')
   async getVersionHistory(
     @Param('productId', ParseUUIDPipe) productId: string,
     @Param('batchSize') batchSize: string,
@@ -121,6 +127,7 @@ export class RecipesController {
    */
   @Put(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('RECIPE_UPDATE')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateRecipeDto: UpdateRecipeDto,
@@ -150,6 +157,7 @@ export class RecipesController {
    */
   @Put(':id/set-active')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('RECIPE_UPDATE')
   async setActiveVersion(
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req,
@@ -172,6 +180,7 @@ export class RecipesController {
    */
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('RECIPE_DELETE')
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
     this.logger.log(`DELETE /recipes/${id} - Deleting recipe`);
     try {

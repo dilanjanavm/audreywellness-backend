@@ -331,7 +331,7 @@ export class RecipeExecutionService {
     // Update total execution elapsed time
     if (additionalTime > 0) {
       execution.totalElapsedTime =
-        (execution.totalElapsedTime || 0) + additionalTime;
+        Number(execution.totalElapsedTime || 0) + additionalTime;
     }
 
     // Save pause information
@@ -418,7 +418,7 @@ export class RecipeExecutionService {
       if (Math.abs(timeDifference) > 0) {
         currentStepExecution.stepElapsedTime = calculatedElapsedTime;
         execution.totalElapsedTime =
-          (execution.totalElapsedTime || 0) + timeDifference;
+          Number(execution.totalElapsedTime || 0) + timeDifference;
         this.logger.log(
           `Resume: Synced elapsedTime from remainingTime: ${dto.remainingTime} min, new elapsedTime: ${calculatedElapsedTime} min`,
         );
@@ -444,6 +444,75 @@ export class RecipeExecutionService {
     this.logger.log(`Resumed execution at ${resumeTime.toISOString()}`);
 
     // Get all step executions for response
+    const stepExecutions = await this.stepExecutionRepository.find({
+      where: { executionId: execution.id },
+      order: { stepOrder: 'ASC' },
+    });
+
+    return this.mapToStatusDto(execution, recipe, stepExecutions);
+  }
+
+  /**
+   * Start a step execution
+   */
+  async startStep(
+    taskId: string,
+    stepOrder: number,
+  ): Promise<RecipeExecutionStatusDto> {
+    const execution = await this.getExecutionByTaskId(taskId);
+
+    if (execution.status !== RecipeExecutionStatus.IN_PROGRESS) {
+      throw new BadRequestException(
+        `Cannot start step for execution with status: ${execution.status}`,
+      );
+    }
+
+    const stepExecution = await this.stepExecutionRepository.findOne({
+      where: {
+        executionId: execution.id,
+        stepOrder,
+      },
+    });
+
+    if (!stepExecution) {
+      throw new NotFoundException(
+        `Step execution not found for step order: ${stepOrder}`,
+      );
+    }
+
+    // Validate step status
+    if (
+      stepExecution.status !== StepExecutionStatus.PENDING &&
+      stepExecution.status !== StepExecutionStatus.PAUSED
+    ) {
+      throw new BadRequestException(
+        `Cannot start step ${stepOrder} with status: ${stepExecution.status}`,
+      );
+    }
+
+    // Start or resume step
+    const startTime = new Date();
+    stepExecution.status = StepExecutionStatus.IN_PROGRESS;
+
+    if (!stepExecution.startedAt) {
+      stepExecution.startedAt = startTime;
+      stepExecution.progress = 0;
+    } else {
+      stepExecution.resumedAt = startTime;
+      // If resuming, we don't reset progress
+    }
+
+    // Update execution current step
+    execution.currentStepId = stepExecution.recipeStepId;
+    execution.currentStepOrder = stepOrder;
+    execution.currentStepProgress = stepExecution.progress || 0;
+
+    await this.stepExecutionRepository.save(stepExecution);
+    await this.executionRepository.save(execution);
+
+    this.logger.log(`Started step ${stepOrder} for task ${taskId}`);
+
+    const recipe = await this.recipesService.findOne(execution.recipeId, false);
     const stepExecutions = await this.stepExecutionRepository.find({
       where: { executionId: execution.id },
       order: { stepOrder: 'ASC' },
@@ -622,7 +691,7 @@ export class RecipeExecutionService {
     // Add additional time to total execution elapsed time
     if (additionalTime > 0) {
       execution.totalElapsedTime =
-        (execution.totalElapsedTime || 0) + additionalTime;
+        Number(execution.totalElapsedTime || 0) + additionalTime;
     }
 
     if (dto.actualTemperature !== undefined) {

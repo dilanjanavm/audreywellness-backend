@@ -1,5 +1,6 @@
 // src/modules/users/dto/user-response.dto.ts
 import { Gender } from '../user.entity';
+import { UserRole } from '../../../common/enums/user-role.enum';
 
 export class UserResponseDto {
   id: string;
@@ -7,7 +8,7 @@ export class UserResponseDto {
   email: string;
   mobileNumber?: string;
   address?: string;
-  contactNumber: string;
+  contactNumber?: string;
   age?: number;
   gender?: Gender;
   roleId?: string;
@@ -16,6 +17,7 @@ export class UserResponseDto {
     name: string;
     code: string;
   };
+  legacyRole?: UserRole;
   isActive: boolean;
   isEmailVerified: boolean;
   mustChangePassword: boolean;

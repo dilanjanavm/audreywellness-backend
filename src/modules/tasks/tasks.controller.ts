@@ -13,12 +13,16 @@ import {
   UseFilters,
   UseInterceptors,
   SetMetadata,
+  UseGuards,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import * as taskInterface from '../../common/interfaces/task.interface';
 import { HttpExceptionFilter } from '../../common/filters/http-exception.filter';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { TaskStatus } from '../../common/enums/task.enum';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 
 // Decorator to mark endpoints as public (skip authentication)
 const IS_PUBLIC_KEY = 'isPublic';
@@ -27,6 +31,7 @@ export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 @Controller('tasks')
 @UseFilters(HttpExceptionFilter)
 @UseInterceptors(TransformInterceptor)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class TasksController {
   private readonly logger = new Logger(TasksController.name);
 
@@ -35,6 +40,7 @@ export class TasksController {
   }
 
   @Get('phases')
+  @Permissions('TASK_VIEW')
   async listPhases(@Query('includeTasks') includeTasks?: string) {
     this.logger.log(`GET /tasks/phases - includeTasks: ${includeTasks}`);
     try {
@@ -55,6 +61,7 @@ export class TasksController {
   }
 
   @Post('phases')
+  @Permissions('TASK_CREATE')
   async createPhase(@Body() dto: taskInterface.CreatePhaseDto) {
     this.logger.log(
       `POST /tasks/phases - Request body: ${JSON.stringify(dto)}`,
@@ -75,6 +82,7 @@ export class TasksController {
   }
 
   @Put('phases/:phaseId')
+  @Permissions('TASK_UPDATE')
   async updatePhase(
     @Param('phaseId') phaseId: string,
     @Body() dto: taskInterface.UpdatePhaseDto,
@@ -96,6 +104,7 @@ export class TasksController {
   }
 
   @Delete('phases/:phaseId')
+  @Permissions('TASK_DELETE')
   async removePhase(
     @Param('phaseId') phaseId: string,
     @Query('reassignPhaseId') reassignPhaseId?: string,
@@ -119,6 +128,7 @@ export class TasksController {
   }
 
   @Post()
+  @Permissions('TASK_CREATE')
   async createTask(@Body() dto: taskInterface.CreateTaskDto) {
     this.logger.log(`POST /tasks - Request received`);
     this.logger.debug(
@@ -161,6 +171,7 @@ export class TasksController {
   }
 
   @Get('phases/:phaseId/tasks')
+  @Permissions('TASK_VIEW')
   async listPhaseTasks(
     @Param('phaseId') phaseId: string,
     @Query('status') status?: string | string[],
@@ -223,6 +234,7 @@ export class TasksController {
   }
 
   @Get('reference/statuses')
+  @Permissions('TASK_VIEW')
   listStatuses() {
     this.logger.log(`GET /tasks/reference/statuses - Getting status reference`);
     try {
@@ -246,6 +258,7 @@ export class TasksController {
    * ⭐ NEW
    */
   @Get('template/:phaseId')
+  @Permissions('TASK_VIEW')
   async getTaskTemplate(@Param('phaseId') phaseId: string) {
     this.logger.log(`GET /tasks/template/${phaseId} - Request received`);
     try {
@@ -271,6 +284,7 @@ export class TasksController {
    * ⭐ NEW
    */
   @Post(':taskId/comments')
+  @Permissions('TASK_UPDATE')
   async addComment(
     @Param('taskId') taskId: string,
     @Body() createCommentDto: taskInterface.CreateTaskCommentDto,
@@ -307,6 +321,7 @@ export class TasksController {
    * ⭐ NEW
    */
   @Get(':taskId/comments')
+  @Permissions('TASK_VIEW')
   async getTaskComments(@Param('taskId') taskId: string) {
     this.logger.log(`GET /tasks/${taskId}/comments - Request received`);
 
@@ -330,6 +345,7 @@ export class TasksController {
    * ⭐ NEW
    */
   @Delete('comments/:commentId')
+  @Permissions('TASK_DELETE')
   async deleteComment(@Param('commentId') commentId: string) {
     this.logger.log(`DELETE /tasks/comments/${commentId} - Request received`);
 
@@ -355,6 +371,7 @@ export class TasksController {
    * ⭐ NEW
    */
   @Post(':taskId/move')
+  @Permissions('TASK_UPDATE')
   async moveTaskToPhase(
     @Param('taskId') taskId: string,
     @Body() moveTaskDto: taskInterface.MoveTaskDto,
@@ -388,6 +405,7 @@ export class TasksController {
    * ⭐ NEW
    */
   @Get(':taskId/movement-history')
+  @Permissions('TASK_VIEW')
   async getTaskMovementHistory(@Param('taskId') taskId: string) {
     this.logger.log(`GET /tasks/${taskId}/movement-history - Request received`);
 
@@ -411,6 +429,7 @@ export class TasksController {
    * ⭐ NEW - Returns task, recipe, costedProduct, recipeExecution, comments, and phases
    */
   @Get(':taskId/details')
+  @Permissions('TASK_VIEW')
   async getTaskDetailsEnhanced(@Param('taskId') taskId: string) {
     this.logger.log(`GET /tasks/${taskId}/details - Request received`);
 
@@ -436,6 +455,7 @@ export class TasksController {
   // These generic :taskId routes come AFTER more specific routes
 
   @Put(':taskId')
+  @Permissions('TASK_UPDATE')
   async updateTask(
     @Param('taskId') taskId: string,
     @Body() dto: taskInterface.UpdateTaskDto,
@@ -457,6 +477,7 @@ export class TasksController {
   }
 
   @Patch(':taskId/position')
+  @Permissions('TASK_UPDATE')
   async updateTaskPosition(
     @Param('taskId') taskId: string,
     @Body() dto: taskInterface.TaskPositionDto,
@@ -480,6 +501,7 @@ export class TasksController {
   }
 
   @Delete(':taskId')
+  @Permissions('TASK_DELETE')
   async deleteTask(@Param('taskId') taskId: string) {
     this.logger.log(`DELETE /tasks/${taskId} - Deleting task`);
     try {

@@ -1,4 +1,3 @@
-// src/modules/roles/roles.controller.ts
 import {
   Controller,
   Get,
@@ -9,20 +8,28 @@ import {
   Param,
   Logger,
   ParseUUIDPipe,
+  UseGuards,
+  ValidationPipe,
 } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { RoleResponseDto } from './dto/role-response.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 
 @Controller('roles')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RolesController {
   private readonly logger = new Logger(RolesController.name);
 
-  constructor(private readonly rolesService: RolesService) {}
+  constructor(private readonly rolesService: RolesService) { }
+
 
   @Post()
-  async create(@Body() createRoleDto: CreateRoleDto): Promise<{ data: RoleResponseDto }> {
+  @Permissions('ROLE_CREATE')
+  async create(@Body(new ValidationPipe()) createRoleDto: CreateRoleDto): Promise<{ data: RoleResponseDto }> {
     this.logger.log(`POST /roles - Creating role: ${createRoleDto.name}`);
     try {
       const role = await this.rolesService.create(createRoleDto);
@@ -35,6 +42,7 @@ export class RolesController {
   }
 
   @Get()
+  @Permissions('ROLE_VIEW')
   async findAll(): Promise<{ data: RoleResponseDto[] }> {
     this.logger.log(`GET /roles - Getting all roles`);
     try {
@@ -47,6 +55,7 @@ export class RolesController {
   }
 
   @Get(':id')
+  @Permissions('ROLE_VIEW')
   async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<{ data: RoleResponseDto }> {
     this.logger.log(`GET /roles/${id} - Getting role`);
     try {
@@ -59,9 +68,10 @@ export class RolesController {
   }
 
   @Put(':id')
+  @Permissions('ROLE_UPDATE')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateRoleDto: UpdateRoleDto,
+    @Body(new ValidationPipe()) updateRoleDto: UpdateRoleDto,
   ): Promise<{ message: string; data: RoleResponseDto }> {
     this.logger.log(`PUT /roles/${id} - Updating role`);
     try {
@@ -77,6 +87,7 @@ export class RolesController {
   }
 
   @Delete(':id')
+  @Permissions('ROLE_DELETE')
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
     this.logger.log(`DELETE /roles/${id} - Deleting role`);
     try {
@@ -89,6 +100,7 @@ export class RolesController {
   }
 
   @Post(':id/permissions')
+  @Permissions('ROLE_ASSIGN_PERMISSIONS')
   async assignPermissions(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('permissionIds') permissionIds: string[],
@@ -108,6 +120,7 @@ export class RolesController {
   }
 
   @Get(':id/permissions')
+  @Permissions('ROLE_VIEW')
   async getRolePermissions(@Param('id', ParseUUIDPipe) id: string): Promise<{ data: any[] }> {
     this.logger.log(`GET /roles/${id}/permissions - Getting role permissions`);
     try {

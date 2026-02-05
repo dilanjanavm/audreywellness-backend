@@ -310,6 +310,55 @@ export class ItemManagementService {
     }
   }
 
+  /**
+   * Remove all items in a category
+   */
+  async removeByCategoryId(categoryId: string): Promise<{ deletedCount: number }> {
+    try {
+      // Validate category exists
+      const category = await this.categoryRepository.findOne({
+        where: { id: categoryId },
+      });
+
+      if (!category) {
+        throw new NotFoundException(`Category with ID ${categoryId} not found`);
+      }
+
+      // Check if any items in this category have suppliers
+      const itemsWithSuppliers = await this.itemRepository.find({
+        where: { categoryId },
+        relations: ['suppliers'],
+      });
+
+      const itemsBlocked = itemsWithSuppliers.filter(
+        (item) => item.suppliers && item.suppliers.length > 0,
+      );
+
+      if (itemsBlocked.length > 0) {
+        throw new BadRequestException(
+          `Cannot delete category items. ${itemsBlocked.length} items have associated suppliers. Remove suppliers first.`,
+        );
+      }
+
+      const result: DeleteResult = await this.itemRepository.delete({
+        categoryId,
+      });
+
+      return { deletedCount: result.affected || 0 };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      console.error('Error removing items by category:', error);
+      throw new InternalServerErrorException(
+        'Failed to remove items by category',
+      );
+    }
+  }
+
   // ========== SUPPLIER MANAGEMENT ==========
 
   /**
