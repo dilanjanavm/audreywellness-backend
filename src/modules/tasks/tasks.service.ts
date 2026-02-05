@@ -28,6 +28,7 @@ import {
 import { resolveAssigneeProfile } from './reference/task-assignees.reference';
 import { User } from '../users/user.entity';
 import { CostingEntity } from '../costing/entities/costing.entity';
+import { CustomerEntity } from '../customer/entities/customer.entity';
 import {
   CreateTaskCommentDto,
   TaskCommentResponseDto,
@@ -56,6 +57,8 @@ export class TasksService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(CostingEntity)
     private readonly costingRepository: Repository<CostingEntity>,
+    @InjectRepository(CustomerEntity)
+    private readonly customerRepository: Repository<CustomerEntity>,
     private readonly costingService: CostingService,
     private readonly recipesService: RecipesService,
     private readonly recipeExecutionService: RecipeExecutionService,
@@ -2067,6 +2070,20 @@ export class TasksService {
       `getTaskStatusByOrderNumber - Task found: ${task.id} (taskId: ${task.taskId}) for order: ${orderNumber}`,
     );
 
+    let customerName = task.customerName;
+    // Check if customerName is a UUID and resolve it if possible
+    if (customerName && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(customerName)) {
+      try {
+        const customer = await this.customerRepository.findOne({ where: { id: customerName } });
+        if (customer) {
+          customerName = customer.name;
+          this.logger.debug(`getTaskStatusByOrderNumber - Resolved customer name from UUID: ${customer.name}`);
+        }
+      } catch (error) {
+        this.logger.warn(`getTaskStatusByOrderNumber - Failed to resolve customer name from UUID: ${error.message}`);
+      }
+    }
+
     return {
       orderNumber: task.orderNumber!,
       taskId: task.taskId,
@@ -2076,7 +2093,7 @@ export class TasksService {
         id: task.phase.id,
         name: task.phase.name,
       },
-      customerName: task.customerName,
+      customerName: customerName,
       customerMobile: task.customerMobile,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,

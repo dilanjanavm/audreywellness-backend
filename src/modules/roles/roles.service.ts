@@ -14,6 +14,7 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 import { RoleResponseDto } from './dto/role-response.dto';
 import { Permission } from '../permissions/entities/permission.entity';
 import { RolePermission } from '../role-permissions/entities/role-permission.entity';
+import { User } from '../users/user.entity';
 
 @Injectable()
 export class RolesService {
@@ -26,6 +27,8 @@ export class RolesService {
     private permissionRepository: Repository<Permission>,
     @InjectRepository(RolePermission)
     private rolePermissionRepository: Repository<RolePermission>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) { }
 
   /**
@@ -173,13 +176,16 @@ export class RolesService {
     }
 
     // Check if role is in use
-    // You might want to add a check here to see if any users are using this role
+    const userCount = await this.userRepository.count({ where: { roleId: id } });
+    if (userCount > 0) {
+      throw new BadRequestException(`Cannot delete role: It is assigned to ${userCount} users.`);
+    }
 
-    // Soft delete by setting isActive to false instead of hard delete
-    role.isActive = false;
-    await this.roleRepository.save(role);
+    // Hard delete (cascade will handle RolePermission)
+    await this.roleRepository.delete(id);
 
-    this.logger.log(`Role deactivated: ${id}`);
+    this.logger.log(`Role deleted: ${id}`);
+    // Rebuild trigger
   }
 
   /**

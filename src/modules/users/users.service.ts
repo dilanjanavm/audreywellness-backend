@@ -26,7 +26,7 @@ export class UsersService {
     @InjectRepository(Role)
     private roleRepository: Repository<Role>,
     private emailService: EmailService,
-  ) {}
+  ) { }
 
   /**
    * Generate a random temporary password
@@ -159,14 +159,14 @@ export class UsersService {
       this.logger.log('═══════════════════════════════════════════════════════');
       this.logger.log('📧 STEP 9: Email sending process');
       this.logger.log('═══════════════════════════════════════════════════════');
-      
+
       if (createUserDto.sendEmail === false) {
         this.logger.log('⏭️  STEP 9 SKIPPED: sendEmail is set to false');
       } else {
         this.logger.log(`   Email will be sent to: ${savedUser.email}`);
         this.logger.log(`   Username: ${savedUser.userName}`);
         this.logger.log(`   Temporary Password: ${tempPassword}`);
-        
+
         try {
           this.logger.log('   📤 Attempting to send email...');
           const emailSent = await this.emailService.sendWelcomeEmail(
@@ -174,7 +174,7 @@ export class UsersService {
             savedUser.userName,
             tempPassword,
           );
-          
+
           if (emailSent) {
             this.logger.log('✅ STEP 9 COMPLETED: Welcome email sent successfully');
           } else {
@@ -204,7 +204,7 @@ export class UsersService {
       this.logger.error(`   Error: ${error.message}`);
       this.logger.error(`   Stack: ${error.stack}`);
       this.logger.error('═══════════════════════════════════════════════════════');
-      
+
       if (
         error instanceof BadRequestException ||
         error instanceof NotFoundException
@@ -278,6 +278,28 @@ export class UsersService {
       }
     }
 
+    // Check for unique constraints before update
+    if (updateUserDto.email && updateUserDto.email !== user.email) {
+      const existingUser = await this.usersRepository.findOne({ where: { email: updateUserDto.email } });
+      if (existingUser && existingUser.id !== id) {
+        throw new BadRequestException(`Email ${updateUserDto.email} is already in use`);
+      }
+    }
+
+    if (updateUserDto.userName && updateUserDto.userName !== user.userName) {
+      const existingUser = await this.usersRepository.findOne({ where: { userName: updateUserDto.userName } });
+      if (existingUser && existingUser.id !== id) {
+        throw new BadRequestException(`Username ${updateUserDto.userName} is already in use`);
+      }
+    }
+
+    if (updateUserDto.mobileNumber && updateUserDto.mobileNumber !== user.mobileNumber) {
+      const existingUser = await this.usersRepository.findOne({ where: { mobileNumber: updateUserDto.mobileNumber } });
+      if (existingUser && existingUser.id !== id) {
+        throw new BadRequestException(`Mobile number ${updateUserDto.mobileNumber} is already in use`);
+      }
+    }
+
     // Update user fields
     Object.assign(user, updateUserDto);
 
@@ -304,7 +326,7 @@ export class UsersService {
     try {
       // STEP 1: Check if user exists
       this.logger.log('📝 STEP 1: Checking if user exists...');
-      const user = await this.usersRepository.findOne({ 
+      const user = await this.usersRepository.findOne({
         where: { id },
         relations: ['role'],
       });
@@ -378,11 +400,12 @@ export class UsersService {
       roleId: user.roleId,
       role: role
         ? {
-            id: role.id,
-            name: role.name,
-            code: role.code,
-          }
+          id: role.id,
+          name: role.name,
+          code: role.code,
+        }
         : undefined,
+      legacyRole: user.legacyRole,
       isActive: user.isActive,
       isEmailVerified: user.isEmailVerified,
       mustChangePassword: user.mustChangePassword,

@@ -22,7 +22,9 @@ import {
 import express from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { CustomerService } from './customer.service';
 import * as customerInterface from '../../common/interfaces/customer.interface';
@@ -34,12 +36,13 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CsvImportResponseDto } from '../../common/interfaces/customer.interface';
 
 @Controller('customers')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class CustomerController {
-  constructor(private readonly customerService: CustomerService) {}
+  constructor(private readonly customerService: CustomerService) { }
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('CUSTOMER_CREATE')
   async create(
     @Body() createCustomerDto: customerInterface.CreateCustomerDto,
   ): Promise<customerInterface.CustomerResponseDto> {
@@ -48,6 +51,7 @@ export class CustomerController {
 
   @Post('import-csv')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('CUSTOMER_CREATE')
   @UseInterceptors(FileInterceptor('file'))
   async importCsv(
     @UploadedFile() file: Express.Multer.File,
@@ -78,6 +82,7 @@ export class CustomerController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('CUSTOMER_VIEW')
   async findAll(
     @Query('search') searchTerm?: string,
     @Query('type') customerType?: CustomerType,
@@ -120,6 +125,7 @@ export class CustomerController {
 
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('CUSTOMER_VIEW')
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<customerInterface.CustomerResponseDto> {
@@ -128,6 +134,7 @@ export class CustomerController {
 
   @Get('sno/:sNo')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('CUSTOMER_VIEW')
   async findOneBySNo(
     @Param('sNo') sNo: string,
   ): Promise<customerInterface.CustomerResponseDto> {
@@ -136,6 +143,7 @@ export class CustomerController {
 
   @Put(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('CUSTOMER_UPDATE')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateCustomerDto: customerInterface.UpdateCustomerDto,
@@ -145,6 +153,7 @@ export class CustomerController {
 
   @Delete(':id')
   @Roles(UserRole.ADMIN)
+  @Permissions('CUSTOMER_DELETE')
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ message: string }> {
@@ -153,6 +162,7 @@ export class CustomerController {
 
   @Get('search/:term')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('CUSTOMER_VIEW')
   async search(
     @Param('term') searchTerm: string,
   ): Promise<customerInterface.CustomerResponseDto[]> {
@@ -161,6 +171,7 @@ export class CustomerController {
 
   @Get(':id/complaints')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('CUSTOMER_VIEW', 'COMPLAINT_VIEW')
   async findCustomerComplaints(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{
@@ -177,6 +188,7 @@ export class CustomerController {
    */
   @Get('export/csv')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('CUSTOMER_VIEW')
   async exportToCsv(
     @Res() res: express.Response,
     @Query('cityArea') cityArea?: string,

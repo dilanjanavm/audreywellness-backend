@@ -129,6 +129,27 @@ export class SeedService {
       { name: 'Update Recipe', code: 'RECIPE_UPDATE', module: 'recipes', description: 'Permission to update recipes' },
       { name: 'Delete Recipe', code: 'RECIPE_DELETE', module: 'recipes', description: 'Permission to delete recipes' },
       { name: 'View Recipe', code: 'RECIPE_VIEW', module: 'recipes', description: 'Permission to view recipes' },
+
+      // Attachment Management Permissions
+      { name: 'Create Attachment', code: 'ATTACHMENT_CREATE', module: 'attachments', description: 'Permission to upload attachments' },
+      { name: 'View Attachment', code: 'ATTACHMENT_VIEW', module: 'attachments', description: 'Permission to view and download attachments' },
+      { name: 'Delete Attachment', code: 'ATTACHMENT_DELETE', module: 'attachments', description: 'Permission to delete attachments' },
+
+      // Maintenance Management Permissions
+      { name: 'Create Maintenance', code: 'MAINTENANCE_CREATE', module: 'maintenance', description: 'Permission to create maintenance records' },
+      { name: 'View Maintenance', code: 'MAINTENANCE_VIEW', module: 'maintenance', description: 'Permission to view maintenance records' },
+      { name: 'Update Maintenance', code: 'MAINTENANCE_UPDATE', module: 'maintenance', description: 'Permission to update maintenance records' },
+      { name: 'Delete Maintenance', code: 'MAINTENANCE_DELETE', module: 'maintenance', description: 'Permission to delete maintenance records' },
+
+      // Manufacturing Management Permissions
+      { name: 'Create Manufacturing', code: 'MANUFACTURING_CREATE', module: 'manufacturing', description: 'Permission to create manufacturing records' },
+      { name: 'View Manufacturing', code: 'MANUFACTURING_VIEW', module: 'manufacturing', description: 'Permission to view manufacturing records' },
+      { name: 'Update Manufacturing', code: 'MANUFACTURING_UPDATE', module: 'manufacturing', description: 'Permission to update manufacturing records' },
+      { name: 'Delete Manufacturing', code: 'MANUFACTURING_DELETE', module: 'manufacturing', description: 'Permission to delete manufacturing records' },
+
+      // Email Management Permissions
+      { name: 'View Email Status', code: 'EMAIL_VIEW', module: 'email', description: 'Permission to view email status' },
+      { name: 'Send Email', code: 'EMAIL_SEND', module: 'email', description: 'Permission to send emails' },
     ];
 
     const createdPermissions: Permission[] = [];
@@ -239,12 +260,13 @@ export class SeedService {
       // Update existing admin to have Super Admin role
       if (existingAdmin.roleId !== superAdminRole.id) {
         existingAdmin.roleId = superAdminRole.id;
-        existingAdmin.legacyRole = UserRole.ADMIN;
+        existingAdmin.legacyRole = UserRole.SUPER_ADMIN;
         await this.userRepository.save(existingAdmin);
         this.logger.log('✅ Updated existing admin user with Super Admin role');
       }
       return;
     }
+
 
     try {
       const salt = await bcrypt.genSalt();
@@ -256,7 +278,7 @@ export class SeedService {
         contactNumber: '0000000000',
         password: hashedPassword,
         roleId: superAdminRole.id,
-        legacyRole: UserRole.ADMIN,
+        legacyRole: UserRole.SUPER_ADMIN,
         isActive: true,
         isEmailVerified: true,
         mustChangePassword: false,

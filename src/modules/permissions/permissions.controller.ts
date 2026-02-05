@@ -1,4 +1,3 @@
-// src/modules/permissions/permissions.controller.ts
 import {
   Controller,
   Get,
@@ -10,19 +9,25 @@ import {
   Query,
   Logger,
   ParseUUIDPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { PermissionsService } from './permissions.service';
 import { CreatePermissionDto } from './dto/create-permission.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
 import { PermissionResponseDto } from './dto/permission-response.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 
 @Controller('permissions')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class PermissionsController {
   private readonly logger = new Logger(PermissionsController.name);
 
-  constructor(private readonly permissionsService: PermissionsService) {}
+  constructor(private readonly permissionsService: PermissionsService) { }
 
   @Post()
+  @Permissions('PERMISSION_CREATE')
   async create(@Body() createPermissionDto: CreatePermissionDto): Promise<{ data: PermissionResponseDto }> {
     this.logger.log(`POST /permissions - Creating permission: ${createPermissionDto.name}`);
     try {
@@ -36,6 +41,7 @@ export class PermissionsController {
   }
 
   @Get()
+  @Permissions('PERMISSION_VIEW')
   async findAll(@Query('module') module?: string): Promise<{ data: PermissionResponseDto[] }> {
     this.logger.log(`GET /permissions - Getting all permissions${module ? ` for module: ${module}` : ''}`);
     try {
@@ -48,6 +54,7 @@ export class PermissionsController {
   }
 
   @Get(':id')
+  @Permissions('PERMISSION_VIEW')
   async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<{ data: PermissionResponseDto }> {
     this.logger.log(`GET /permissions/${id} - Getting permission`);
     try {
@@ -60,6 +67,7 @@ export class PermissionsController {
   }
 
   @Get('module/:module')
+  @Permissions('PERMISSION_VIEW')
   async findByModule(@Param('module') module: string): Promise<{ data: PermissionResponseDto[] }> {
     this.logger.log(`GET /permissions/module/${module} - Getting permissions by module`);
     try {
@@ -72,6 +80,7 @@ export class PermissionsController {
   }
 
   @Get('grouped/by-module')
+  @Permissions('PERMISSION_VIEW')
   async findAllGroupedByModule(): Promise<{
     data: {
       modules: { [module: string]: PermissionResponseDto[] };
@@ -90,6 +99,7 @@ export class PermissionsController {
   }
 
   @Put(':id')
+  @Permissions('PERMISSION_UPDATE')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updatePermissionDto: UpdatePermissionDto,
@@ -108,6 +118,7 @@ export class PermissionsController {
   }
 
   @Delete(':id')
+  @Permissions('PERMISSION_DELETE')
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
     this.logger.log(`DELETE /permissions/${id} - Deleting permission`);
     try {

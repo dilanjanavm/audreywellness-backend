@@ -18,6 +18,8 @@ import {
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 import { Roles } from '../../common/decorators/roles.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { ComplaintService } from './complaint.service';
 import * as complaintInterface from '../../common/interfaces/complaint.interface';
@@ -29,12 +31,13 @@ import {
 import { Public } from '../../common/decorators/public.decorator';
 
 @Controller('complaints')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ComplaintController {
   constructor(private readonly complaintService: ComplaintService) { }
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('COMPLAINT_CREATE')
   async create(
     @Body() createComplaintDto: complaintInterface.CreateComplaintDto,
     @Request() req,
@@ -45,6 +48,7 @@ export class ComplaintController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('COMPLAINT_VIEW')
   async findAll(
     @Query('search') searchTerm?: string,
     @Query('status', new ParseArrayPipe({ optional: true }))
@@ -87,6 +91,7 @@ export class ComplaintController {
 
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('COMPLAINT_VIEW')
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<complaintInterface.ComplaintResponseDto> {
@@ -95,6 +100,7 @@ export class ComplaintController {
 
   @Put(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('COMPLAINT_UPDATE')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateComplaintDto: complaintInterface.UpdateComplaintDto,
@@ -113,6 +119,7 @@ export class ComplaintController {
    */
   @Put(':id/status')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('COMPLAINT_UPDATE')
   async updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateStatusDto: complaintInterface.UpdateComplaintStatusDto,
@@ -138,6 +145,7 @@ export class ComplaintController {
 
   @Post(':id/notes')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('COMPLAINT_UPDATE')
   async addNote(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('note') note: string,
@@ -149,6 +157,7 @@ export class ComplaintController {
 
   @Post(':id/feedback')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('COMPLAINT_UPDATE')
   async submitFeedback(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('feedback') feedback: string,
@@ -159,6 +168,7 @@ export class ComplaintController {
 
   @Post(':id/send-sms')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('COMPLAINT_UPDATE')
   async sendSms(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('phoneNumber') phoneNumber: string,

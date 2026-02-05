@@ -29,7 +29,7 @@ export class RecipeExecutionController {
 
   constructor(
     private readonly recipeExecutionService: RecipeExecutionService,
-  ) {}
+  ) { }
 
   /**
    * Start recipe execution
@@ -68,6 +68,19 @@ export class RecipeExecutionController {
   ): Promise<RecipeExecutionStatusDto> {
     this.logger.log(`Resuming recipe execution for task: ${taskId}`);
     return this.recipeExecutionService.resumeExecution(taskId, dto);
+  }
+
+  /**
+   * Start a specific step
+   * POST /tasks/:taskId/recipe/steps/:stepOrder/start
+   */
+  @Post('steps/:stepOrder/start')
+  async startStep(
+    @Param('taskId') taskId: string,
+    @Param('stepOrder', ParseIntPipe) stepOrder: number,
+  ): Promise<RecipeExecutionStatusDto> {
+    this.logger.log(`Starting step ${stepOrder} for task: ${taskId}`);
+    return this.recipeExecutionService.startStep(taskId, stepOrder);
   }
 
   /**

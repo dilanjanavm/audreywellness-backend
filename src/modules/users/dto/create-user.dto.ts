@@ -31,8 +31,8 @@ export class CreateUserDto {
   address?: string;
 
   @IsString()
-  @IsNotEmpty()
-  contactNumber: string;
+  @IsOptional()
+  contactNumber?: string;
 
   @IsNumber()
   @IsOptional()
@@ -45,8 +45,8 @@ export class CreateUserDto {
   gender?: Gender;
 
   @IsString()
-  @IsOptional()
-  roleId?: string;
+  @IsNotEmpty()
+  roleId: string;
 
   @IsString()
   @IsOptional()

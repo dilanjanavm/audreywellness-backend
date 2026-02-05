@@ -22,7 +22,9 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import express from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import {
   SuppliersService,
@@ -35,12 +37,13 @@ import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 
 @Controller('suppliers')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class SuppliersController {
-  constructor(private readonly suppliersService: SuppliersService) {}
+  constructor(private readonly suppliersService: SuppliersService) { }
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('SUPPLIER_CREATE')
   async create(
     @Body() createSupplierDto: CreateSupplierDto,
   ): Promise<Supplier> {
@@ -49,6 +52,7 @@ export class SuppliersController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('SUPPLIER_VIEW')
   async findAll(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number = 10,
@@ -73,12 +77,14 @@ export class SuppliersController {
 
   @Get('stats')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('SUPPLIER_VIEW')
   async getStats(): Promise<SupplierStats> {
     return this.suppliersService.getStats();
   }
 
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('SUPPLIER_VIEW')
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('includeItems', new DefaultValuePipe(false), ParseBoolPipe)
@@ -89,6 +95,7 @@ export class SuppliersController {
 
   @Get('reference/:reference')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('SUPPLIER_VIEW')
   async findByReference(
     @Param('reference') reference: string,
     @Query('includeItems', new DefaultValuePipe(false), ParseBoolPipe)
@@ -99,6 +106,7 @@ export class SuppliersController {
 
   @Put(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('SUPPLIER_UPDATE')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateSupplierDto: UpdateSupplierDto,
@@ -108,6 +116,7 @@ export class SuppliersController {
 
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('SUPPLIER_DELETE')
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ message: string }> {
@@ -118,6 +127,7 @@ export class SuppliersController {
 
   @Get(':id/items')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('SUPPLIER_VIEW')
   async getSupplierItems(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ItemEntity[]> {
@@ -126,6 +136,7 @@ export class SuppliersController {
 
   @Post(':id/items')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('SUPPLIER_UPDATE')
   async addItemsToSupplier(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { itemIds: string[] },
@@ -143,6 +154,7 @@ export class SuppliersController {
 
   @Delete(':id/items')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('SUPPLIER_UPDATE')
   async removeItemsFromSupplier(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { itemIds: string[] },
@@ -160,6 +172,7 @@ export class SuppliersController {
 
   @Get('items/:itemId/suppliers')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.USER)
+  @Permissions('SUPPLIER_VIEW')
   async getSuppliersByItem(
     @Param('itemId', ParseUUIDPipe) itemId: string,
   ): Promise<Supplier[]> {
@@ -170,6 +183,7 @@ export class SuppliersController {
 
   @Post('import')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('SUPPLIER_CREATE')
   @UseInterceptors(FileInterceptor('file'))
   async importSuppliers(
     @UploadedFile() file: Express.Multer.File,
@@ -187,6 +201,7 @@ export class SuppliersController {
 
   @Get('export/csv')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('SUPPLIER_VIEW')
   async exportSuppliers(@Res() res: express.Response): Promise<void> {
     const csvContent = await this.suppliersService.exportToCsv();
 

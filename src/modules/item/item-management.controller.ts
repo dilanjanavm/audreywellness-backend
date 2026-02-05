@@ -37,7 +37,7 @@ import {
 import { Response } from 'express';
 
 @Controller('items')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ItemManagementController {
   constructor(private readonly itemService: ItemManagementService) { }
 
@@ -229,6 +229,27 @@ export class ItemManagementController {
       }
 
       const result = await this.itemService.bulkRemove(itemCodes);
+      return {
+        message: `${result.deletedCount} items deleted successfully`,
+        deletedCount: result.deletedCount,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Delete all items in a category
+   */
+  @Delete('category/:categoryId')
+  @Roles(UserRole.ADMIN)
+  @Permissions('ITEM_DELETE')
+  async removeByCategoryId(
+    @Param('categoryId') categoryId: string,
+  ): Promise<{ message: string; deletedCount: number }> {
+    // eslint-disable-next-line no-useless-catch
+    try {
+      const result = await this.itemService.removeByCategoryId(categoryId);
       return {
         message: `${result.deletedCount} items deleted successfully`,
         deletedCount: result.deletedCount,

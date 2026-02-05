@@ -34,8 +34,8 @@ export class User {
   @Column({ type: 'text', nullable: true })
   address?: string;
 
-  @Column()
-  contactNumber: string;
+  @Column({ nullable: true })
+  contactNumber?: string;
 
   @Column({ type: 'int', nullable: true })
   age?: number;

@@ -12,7 +12,11 @@ import {
   BadRequestException,
   DefaultValuePipe,
   ParseIntPipe,
+  UseGuards,
 } from '@nestjs/common';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 import { CostingService } from './costing.service';
 import { CreateCostingDto } from './dto/create-costing.dto';
 import { UpdateCostingDto } from './dto/update-costing.dto';
@@ -30,6 +34,7 @@ import {
 } from './dto/cost-history.dto';
 
 @Controller('costing')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class CostingController {
   constructor(private readonly costingService: CostingService) { }
 
@@ -37,6 +42,7 @@ export class CostingController {
    * Create a new costing
    */
   @Post()
+  @Permissions('COSTING_CREATE')
   async create(
     @Body() createCostingDto: CreateCostingDto,
   ): Promise<{ message: string; data: CostingResponseDto }> {
@@ -55,6 +61,7 @@ export class CostingController {
    * Get all costings for an item
    */
   @Get('item/:itemId')
+  @Permissions('COSTING_VIEW')
   async findByItemId(
     @Param('itemId', ParseUUIDPipe) itemId: string,
   ): Promise<{ data: CostingResponseDto[] }> {
@@ -70,6 +77,7 @@ export class CostingController {
    * Get active costing for an item
    */
   @Get('item/:itemId/active')
+  @Permissions('COSTING_VIEW')
   async findActiveByItemId(
     @Param('itemId', ParseUUIDPipe) itemId: string,
   ): Promise<{ data: CostingResponseDto }> {
@@ -85,6 +93,7 @@ export class CostingController {
    * Get costing by ID
    */
   @Get(':id')
+  @Permissions('COSTING_VIEW')
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ data: CostingResponseDto }> {
@@ -100,6 +109,7 @@ export class CostingController {
    * Update costing
    */
   @Put(':id')
+  @Permissions('COSTING_UPDATE')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateCostingDto: UpdateCostingDto,
@@ -119,6 +129,7 @@ export class CostingController {
    * Set costing as active version
    */
   @Put(':id/set-active')
+  @Permissions('COSTING_UPDATE')
   async setActiveVersion(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ message: string; data: CostingResponseDto }> {
@@ -137,6 +148,7 @@ export class CostingController {
    * Delete all costings for an item
    */
   @Delete('item/:itemId')
+  @Permissions('COSTING_DELETE')
   async removeAllByItem(
     @Param('itemId', ParseUUIDPipe) itemId: string,
   ): Promise<{ message: string }> {
@@ -152,6 +164,7 @@ export class CostingController {
    * Delete costing
    */
   @Delete(':id')
+  @Permissions('COSTING_DELETE')
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ message: string }> {
@@ -167,6 +180,7 @@ export class CostingController {
    * Compare two costing versions
    */
   @Get('compare/:costingId1/:costingId2')
+  @Permissions('COSTING_VIEW')
   async compareCostings(
     @Param('costingId1', ParseUUIDPipe) costingId1: string,
     @Param('costingId2', ParseUUIDPipe) costingId2: string,
@@ -201,6 +215,7 @@ export class CostingController {
    * Get costing history for an item
    */
   @Get('item/:itemId/history')
+  @Permissions('COSTING_VIEW')
   async getCostingHistory(
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
@@ -235,6 +250,7 @@ export class CostingController {
    * Recalculate costing based on current raw material prices
    */
   @Post(':id/recalculate')
+  @Permissions('COSTING_UPDATE')
   async recalculateCosting(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ message: string; data: CostingResponseDto }> {
@@ -253,6 +269,7 @@ export class CostingController {
    * Bulk operations - set multiple costings as inactive
    */
   @Post('bulk/deactivate')
+  @Permissions('COSTING_UPDATE')
   async bulkDeactivate(
     @Body('costingIds') costingIds: string[],
   ): Promise<{ message: string; deactivatedCount: number }> {
@@ -377,6 +394,7 @@ export class CostingController {
   }
 
   @Get('items/co')
+  @Permissions('COSTING_VIEW')
   async findAllItemsWithCosting(
     @Query() query: ItemsWithCostingQueryDto,
   ): Promise<{ data: PaginatedItemsWithCostingResponse }> {
@@ -392,6 +410,7 @@ export class CostingController {
    * Get items by category with costing information (paginated)
    */
   @Get('items/category/:category')
+  @Permissions('COSTING_VIEW')
   async findItemsByCategoryWithCosting(
     @Param('category') category: string,
     @Query() query: Omit<ItemsWithCostingQueryDto, 'category'>,
@@ -411,6 +430,7 @@ export class CostingController {
    * Get single item with costing information
    */
   @Get('items/:itemCode')
+  @Permissions('COSTING_VIEW')
   async findItemWithCosting(
     @Param('itemCode') itemCode: string,
   ): Promise<{ data: ItemWithCostingResponseDto }> {
@@ -426,6 +446,7 @@ export class CostingController {
    * Search items with costing information (paginated)
    */
   @Get('items/search/:term')
+  @Permissions('COSTING_VIEW')
   async searchItemsWithCosting(
     @Param('term') searchTerm: string,
     @Query() query: Omit<ItemsWithCostingQueryDto, 'search'>,
@@ -445,6 +466,7 @@ export class CostingController {
    * Get items by multiple category IDs with costing information (paginated)
    */
   @Post('items/by-categories')
+  @Permissions('COSTING_VIEW')
   async findItemsByCategoryIdsWithCosting(
     @Body() dto: ItemsByCategoriesDto,
   ): Promise<{ data: PaginatedItemsWithCostingResponse }> {
@@ -462,6 +484,7 @@ export class CostingController {
    * If itemId is provided, returns a single product with all costing versions
    */
   @Get('products/costed')
+  @Permissions('COSTING_VIEW')
   async getCostedProducts(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number = 10,
@@ -506,6 +529,7 @@ export class CostingController {
    * Get detailed cost history for a product with cost change tracking
    */
   @Get('products/:itemId/cost-history')
+  @Permissions('COSTING_VIEW')
   async getProductCostHistory(
     @Param('itemId', ParseUUIDPipe) itemId: string,
   ): Promise<{ data: ProductCostHistoryDto }> {
