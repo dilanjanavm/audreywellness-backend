@@ -39,6 +39,8 @@ import { TaskDetailResponseDto } from '../../common/interfaces/task-detail.inter
 import { CostingService } from '../costing/costing.service';
 import { RecipesService } from '../recipes/recipes.service';
 import { RecipeExecutionService } from './recipe-execution.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/entities/notification.entity';
 
 @Injectable()
 export class TasksService {
@@ -62,6 +64,7 @@ export class TasksService {
     private readonly costingService: CostingService,
     private readonly recipesService: RecipesService,
     private readonly recipeExecutionService: RecipeExecutionService,
+    private readonly notificationsService: NotificationsService,
   ) {
     this.logger.log('TasksService initialized');
   }
@@ -1028,6 +1031,94 @@ export class TasksService {
       `addComment - Comment added successfully: ${savedComment.id}`,
     );
 
+    // Handle Mentions and Notifications
+    try {
+      // Parse mentions from comment HTML (e.g. <span class="mention" data-id="USER_ID">@Username</span>)
+      // Quill mention format: <span class="mention" data-index="0" data-denotation-char="@" data-id="USER_ID" data-value="USERNAME">﻿<span contenteditable="false"><span class="ql-mention-denotation-char">@</span>USERNAME</span>﻿</span>
+      // We look for data-id attribute
+      const mentionRegex = /data-id="([^"]+)"/g;
+      let match;
+      const mentionedUserIds = new Set<string>();
+
+      while ((match = mentionRegex.exec(createCommentDto.comment)) !== null) {
+        mentionedUserIds.add(match[1]);
+      }
+
+      const senderName = owner?.userName || createCommentDto.ownerName || 'Unknown User';
+
+      // If task is unassigned, assign to first mentioned user
+      if (!task.assignedUserId && mentionedUserIds.size > 0) {
+        const firstUserId = Array.from(mentionedUserIds)[0];
+
+        // Validation: Check if it's a valid UUID before querying
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(firstUserId)) {
+          const userToAssign = await this.userRepository.findOne({ where: { id: firstUserId } });
+
+          if (userToAssign && userToAssign.isActive) {
+            task.assignedUser = userToAssign;
+            task.assignedUserId = userToAssign.id;
+            task.assigneeId = userToAssign.id;
+            task.assigneeName = userToAssign.userName;
+            task.assigneeRole = userToAssign.role?.code;
+
+            await this.taskRepository.save(task);
+
+            this.logger.log(`addComment - Auto-assigned task ${task.taskId} to mentioned user ${userToAssign.userName}`);
+
+            // Notify about assignment
+            await this.notificationsService.create({
+              userId: userToAssign.id,
+              type: NotificationType.ASSIGN,
+              resourceId: task.taskId, // Use taskId for frontend routing
+              resourceType: 'task',
+              message: `You were mentioned and assigned to task "${task.task}" by ${senderName}`,
+              senderId: owner?.id,
+              isRead: false
+            });
+
+            // Remove from set to avoid double notification (mention + assignment)
+            mentionedUserIds.delete(firstUserId);
+          }
+        }
+      }
+
+      // Notify other mentioned users
+      for (const userId of mentionedUserIds) {
+        // Don't notify self
+        if (userId === owner?.id) continue;
+
+        // Skip invalid IDs
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) continue;
+
+        await this.notificationsService.create({
+          userId: userId,
+          type: NotificationType.MENTION,
+          resourceId: task.taskId, // Use taskId for frontend routing
+          resourceType: 'task',
+          message: `${senderName} mentioned you in a comment on task "${task.task}"`,
+          senderId: owner?.id,
+          isRead: false
+        });
+      }
+
+      // Notify assignee if someone else comments (and they weren't just assigned or mentioned)
+      if (task.assignedUserId && task.assignedUserId !== owner?.id && !mentionedUserIds.has(task.assignedUserId)) {
+        await this.notificationsService.create({
+          userId: task.assignedUserId,
+          type: NotificationType.COMMENT,
+          resourceId: task.taskId,
+          resourceType: 'task',
+          message: `${senderName} commented on task "${task.task}"`,
+          senderId: owner?.id,
+          isRead: false
+        });
+      }
+
+    } catch (error) {
+      this.logger.error(`addComment - Error processing notifications: ${error.message}`, error.stack);
+      // Don't fail the comment creation if notifications fail
+    }
+
     // Reload comment with owner relation
     const commentWithOwner = await this.commentRepository.findOne({
       where: { id: savedComment.id },
@@ -1769,6 +1860,19 @@ export class TasksService {
 
     // Find task with all relations
     const task = await this.findTaskByTaskIdOrThrow(taskId);
+
+    // Resolve customer name if it's a UUID (Fix for issue where UUID is sent instead of name)
+    if (task.customerName && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(task.customerName)) {
+      try {
+        const customer = await this.customerRepository.findOne({ where: { id: task.customerName } });
+        if (customer) {
+          this.logger.debug(`getTaskDetailsEnhanced - Resolved customer name from UUID: ${customer.name}`);
+          task.customerName = customer.name;
+        }
+      } catch (error) {
+        this.logger.warn(`getTaskDetailsEnhanced - Failed to resolve customer name from UUID: ${error.message}`);
+      }
+    }
 
     // Map task to response DTO with all fields
     const taskResponse = this.mapTaskToResponseDto(task);

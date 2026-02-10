@@ -21,6 +21,7 @@ import { RolePermissionsModule } from './modules/role-permissions/role-permissio
 import { RecipesModule } from './modules/recipes/recipes.module';
 import { CourierModule } from './modules/courier/courier.module';
 import { SmsModule } from './modules/sms/sms.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { SmsModule } from './modules/sms/sms.module';
     RecipesModule,
     CourierModule,
     SmsModule,
+    NotificationsModule,
   ],
   controllers: [],
   providers: [],

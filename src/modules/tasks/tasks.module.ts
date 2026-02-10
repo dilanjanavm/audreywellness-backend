@@ -18,6 +18,7 @@ import { User } from '../users/user.entity';
 import { CostingEntity } from '../costing/entities/costing.entity';
 import { CostingModule } from '../costing/costing.module';
 import { RecipesModule } from '../recipes/recipes.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { CustomerEntity } from '../customer/entities/customer.entity';
 
 @Module({
@@ -37,6 +38,7 @@ import { CustomerEntity } from '../customer/entities/customer.entity';
     ]),
     CostingModule, // Import to access CostingService
     RecipesModule, // Import to access RecipesService
+    NotificationsModule,
   ],
   controllers: [TasksController, RecipeExecutionController, TaskTemplateController],
   providers: [TasksService, RecipeExecutionService, TaskTemplateService],
