@@ -468,6 +468,7 @@ export class ComplaintService {
         ComplaintStatus.IN_PROGRESS,
         ComplaintStatus.ON_HOLD,
         ComplaintStatus.REJECTED,
+        ComplaintStatus.RECEIVED, // Allow going back to received/open
       ],
       [ComplaintStatus.IN_PROGRESS]: [
         ComplaintStatus.ON_HOLD,
